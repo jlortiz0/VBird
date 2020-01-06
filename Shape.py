@@ -1,10 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 
 import math
 
 class Shape(object):
-    def __init__(self):
-        pass
 
     numDrones = 0
 
@@ -21,10 +19,7 @@ class Shape(object):
 
     def getCurrPosMasterA(self):
         #  will read only one line of the file for the position of the master drone.. (each drone has specific identity/name in log file) ..keep default for 0 testing
-        MPOSA = [None]*3
-        MPOSA[0] = 0
-        MPOSA[1] = 0
-        MPOSA[2] = 0
+        MPOSA = [0, 0, 0]
         return MPOSA
 
     def setCurrPosMasterA(self, APos):
@@ -33,35 +28,27 @@ class Shape(object):
         self.MAZ = APos[2]
 
     def printCurrPosMasterA(self, APos):
-        currPos = "Current Starting Position A is: ("
-        for d in APos:
-            currPos += str(d) + ","
-        currPos += ")"
-        print currPos
+        print("Current Starting Position A is: ("+",".join(map(str, APos))+")")
 
     def askFinalDest(self):
-        MPOSB = [None]*3
-        print "What is the final X point of the Master Drone?: "
-        X = float(raw_input())
+        MPOSB = [0, 0, 0]
+        X = float(input("What is the final X point of the Master Drone?: "))
         MPOSB[0] = X
         self.MBX = X
-        print "What is the final Y point of the Master Drone?: "
-        Y = float(raw_input())
+        Y = float(input("What is the final Y point of the Master Drone?: "))
         MPOSB[1] = Y
         self.MBY = Y
-        print "What is the final X point of the Master Drone?: "
-        Z = float(raw_input())
+        Z = float(input("What is the final X point of the Master Drone?: "))
         MPOSB[2] = Z
         self.MBZ = Z
-        print "The swarm will fly to this Point B: (" + str(X) + "," + str(Y) + "," + str(Z) + ")"
+        print("The swarm will fly to this Point B: ("+",".join(map(str, MPOSB))+")")
         return MPOSB
 
     # calculates the dist for master drone same for all other drones but formation needs to be known
     def setDirectDistM(self):
         sqrtVal = (self.MAX - self.MBX)**2 + (self.MAY - self.MBY)**2
         # print sqrtVal
-        distance = math.sqrt(sqrtVal)
-        self.directDistM = distance
+        self.directDistM = math.sqrt(sqrtVal)
 
     def getDirectDistM(self):
         return self.directDistM
@@ -103,14 +90,14 @@ class Shape(object):
         dir1 = ""
         dir2 = ""
         if yVal > 0:
-            dir1 += "north"
-        else:
-            dir1 += "south"
+            dir1 = "north"
+        elif yVal < 0:
+            dir1 = "south"
         if xVal > 0:
-            dir2 += "east"
-        else:
-            dir2 += "west"
-        return (str(angle) + " degrees " + dir1 + " of " + dir2)
+            dir2 = "east"
+        elif xVal < 0:
+            dir2 = "west"
+        return (str(angle) + " degrees " + dir1 + dir2)
 
     # end of dir method
     def calcAngle(self, xdist, ydist):
@@ -124,8 +111,7 @@ class Shape(object):
     # num of drones shd be DEFINED 
     # checkFormation DECLARED?
     def setNumDrones(self):
-        print "How many drones are there?"
-        self.numDrones = int(raw_input())
+        self.numDrones = int(input("How many drones are there? "))
         return self.numDrones
 
     def checkFormation(self, numDrones):

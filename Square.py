@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 
 from Shape import Shape
 
@@ -9,13 +9,9 @@ class Square(Shape):
     # calc the linear direct path 2d
     # ask # of drones
     def printShriKishoriKishore(self):
-        print "ShriKishoriKishore Enter name"
-        s = raw_input()
+        print("ShriKishoriKishore")
 
     def checkFormation(self, numDrones):
-        print "checking whether the chosen number of drones can be accomodated in the chosen formation..."
-        formPoss = False
-        if (numDrones % 4) == 0:
-            formPoss = True
-        return formPoss
+        print("checking whether the chosen number of drones can be accomodated in the chosen formation...")
+        return not bool(numDrones % 4)
 

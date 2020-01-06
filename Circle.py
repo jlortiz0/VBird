@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 
 from Shape import Shape
 
@@ -6,7 +6,7 @@ from Shape import Shape
 # ask # of drones DONE IN SHAPE PARENT CLASS
 class Circle(Shape):
     def printShriKishoriKishore(self):
-        print "ShriKishoriKishore"
+        print("ShriKishoriKishore")
 
     def checkFormation(self, numDrones):
         return True
