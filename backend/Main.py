@@ -1,8 +1,7 @@
 #!/usr/bin/python3
 
 import math
-from Shape import Shape
-from Circle import Circle
+from Shape import Shape, Circle
 from Rectangle import Rectangle
 from Square import Square
 from Triangle import Triangle

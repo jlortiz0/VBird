@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8"/>
+    <title>Flyte Software</title>
+    <style>
+      body {
+        margin:0;
+        font-family: "Lato", sans-serif;
+      }
+
+      .sidepanel  {
+        width: 0;
+        position: fixed;
+        z-index: 1;
+        height: calc(100% - 77px);
+        top: 77px;
+        background-color: #111;
+        overflow-x: hidden;
+        transition: 0.5s;
+        padding-top: 5px;
+        font-size: 25px;
+        color: #818181;
+      }
+
+      .sidepanel textarea {
+        position: absolute;
+        resize: none;
+        left: 5px;
+        width: calc(100% - 15px);
+        height: 90%;
+        background-color: #101528;
+        color: white;
+        transition: 0.3s;
+      }
+
+      .sidepanel a {
+        padding: 8px 8px 8px 32px;
+        text-decoration: none;
+        font-size: 25px;
+        color: #818181;
+        display: block;
+        transition: 0.3s;
+      }
+
+      .sidepanel a:hover {
+        color: #f1f1f1;
+      }
+
+      .sidepanel table, th, td {
+        border: 1px solid white;
+        border-collapse: collapse;
+      }
+
+      .openbtn {
+        position: fixed;
+        bottom: 0;
+        transition: 0.5s;
+        z-index: 2;
+        font-size: 20px;
+        cursor: e-resize;
+        background-color: #111;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+      }
+
+      .openbtn:hover {
+        background-color:#444;
+      }
+
+      .navbar {
+        overflow: hidden;
+        background-color: #333;
+        position: fixed;
+        top: 0;
+        width: 100%;
+        float: center;
+        color: #f2f2f2;
+        text-align: center;
+        padding: 0px 0px;
+        text-decoration: none;
+        font-size: 25px;
+      }
+
+      .main {
+        padding: 16px;
+        margin-top: 50px;
+      }
+
+      #formA input[type="number"] {
+        width: 10%;
+      }
+
+      #graph {
+        position: fixed;
+        height: calc(100% - 78px);
+        width: 100%;
+        top: 77px;
+        left: 0;
+      }
+    </style>
+    <script>
+      function toggleLeftPanel() {
+        if (document.getElementById("leftSidePanel").style.width == "25%") {
+          document.getElementById("leftSidePanel").style.width = "0";
+          document.getElementById("leftPanelBtn").style.cursor = "w-resize";
+          document.getElementById("leftPanelBtn").style.left = "0";
+          document.getElementById("leftPanelBtn").textContent = "Log >";
+        } else {
+          document.getElementById("leftSidePanel").style.width = "25%";
+          document.getElementById("leftPanelBtn").style.left = "25%";
+          document.getElementById("leftPanelBtn").style.cursor = "e-resize";
+          document.getElementById("leftPanelBtn").textContent = "<";
+        }
+      }
+
+      function toggleRightPanel() {
+        if (document.getElementById("rightSidePanel").style.width == "25%") {
+          document.getElementById("rightSidePanel").style.width = "0";
+          document.getElementById("rightPanelBtn").style.cursor = "w-resize";
+          document.getElementById("rightPanelBtn").style.right = "0";
+          document.getElementById("rightPanelBtn").textContent = "< Data";
+        } else {
+          document.getElementById("rightSidePanel").style.width = "25%";
+          document.getElementById("rightPanelBtn").style.right = "25%";
+          document.getElementById("rightPanelBtn").style.cursor = "e-resize";
+          document.getElementById("rightPanelBtn").textContent = ">";
+        }
+      }
+
+      
+      var scheme = "ws";
+      if (document.location.protocol === "https:") {
+        scheme += "s"
+      }
+      var port = 7777
+      var ws = null
+      if (document.location.hostname.length == 0) {
+        var ws = new WebSocket(scheme+"://localhost:"+port, "json");
+      } else {
+        var ws = new WebSocket(scheme+"://"+document.location.hostname+":"+port, "json");
+      }
+      var msgCallbacks = new Map();
+      ws.onmessage = function (event) {
+      	var data = JSON.parse(event.data);
+      	if (msgCallbacks.has(data.method)) {
+      		msgCallbacks.get(data.method).call(data);
+      		if (msgCallbacks.get(data.method).oneshot) {
+      			msgCallbacks.delete(data.method);
+      		}
+      	} else {
+      		logData("Dropped packet with method "+data.method);
+      	}
+      }
+      function sendData(data) {
+        ws.send(JSON.stringify(data))
+      }
+      function registerMsgCall(method, func, oneshot=false) {
+      	msgCallbacks.set(method, {call: func, "oneshot": oneshot})
+      }
+      registerMsgCall("logData", function(data) {logData(data.message);});
+      registerMsgCall("error", function(data) {alert(data.message);});
+    </script>
+  </head>
+  <body>
+
+    <div class="navbar">
+      <p>FLYTE SOFTWARE<p>
+    </div>
+
+    <div class="main" align="center">
+      <div id="leftSidePanel" class="sidepanel" style="left: 0">
+        <a href="#" id="2D3Dswitch" onclick="toggle2D3D()">2D Top View</a>
+        <textarea readonly id="logArea"></textarea>
+        <script>
+          //Why is this not in the standard library?
+          function zeroPad(num, places) {
+            return "0".repeat(places).substring(num.toString().length) + num;
+          }
+
+          function getTimestamp() {
+            d = new Date();
+            return zeroPad(d.getHours(), 2) + ":" + zeroPad(d.getMinutes(), 2) + ":" + zeroPad(d.getSeconds(), 2);
+          }
+          
+          function logData(data) {
+            document.getElementById("logArea").textContent += "[" + getTimestamp() + "] " + data + "\n"
+          }
+          logData("Page Loaded")
+
+          function toggle2D3D() {
+            if (document.getElementById("2D3Dswitch").textContent == "2D Top View") {
+              document.getElementById("2D3Dswitch").textContent = "3D View"
+            } else {
+              document.getElementById("2D3Dswitch").textContent = "2D Top View"
+            }
+          }
+        </script>
+      </div>
+      <div id="rightSidePanel" class="sidepanel" style="right: 0">
+        <script>
+            function getFlightPts() {
+                var f = document.getElementById("formA");
+                if (f[2].value == f[5].value && f[3].value == f[6].value && f[4].value == f[7].value) {
+                    alert("Point A and Point B cannot be the same!");
+                    return;
+                }
+                var request = {shape: f[0].value}
+                request["count"] = f[1].value;
+                request["distBetween"] = f[2].value;
+                request["targetPoint"] = [f[6].value, f[7].value, f[8].value];
+                request["method"] = "getPoints";
+                registerMsgCall("pointsList", function(data) {
+                	f.style.display = "none";
+                	document.getElementById("formB").style.display = "block";
+            	}, true);
+                sendData(request);
+            }
+
+            function delFlightPts() {
+                sendData({method: "delPts"});
+                document.getElementById("formB").style.display = "none";
+                document.getElementById("formA").style.display = "block";
+                while (document.getElementById("ptsTab").rows.length>1) {
+                    document.getElementById("ptsTab").removeRow(1);
+                }
+            }
+        </script>
+        <h4 style="margin: 16px">Flight Planner:</h4>
+        <form novalidate onsubmit="getFlightPts()" id="formA" action="javascript:void(0);">
+            Formation: <select name="shape">
+                <option value="squ">Square</option>
+                <option value="trig">Triangle</option>
+                <option value="rect">Rectangle</option>
+                <option value="cir">Circle</option>
+            </select>
+            <br>
+            # of drones: <input type="number" name="droneCount" value=4><br>
+            Distance between drones: <input type="number" name="droneDist" value=2><br>
+            Drone pos: <input type="number" name="pAX" value=0 readonly>
+            <input type="number" name="pAY" value=0 readonly>
+            <input type="number" name="pAZ" value=0 readonly><br>
+            Target point: <input type="number" name="pBX" value=5 readonly>
+            <input type="number" name="pBY" value=5 readonly><br>
+            Target height: <input type="number" name="pBZ" value=5><br>
+            <input type="submit" value="Submit">
+        </form>
+        <form style="display: none" novalidate onreset="delFlightPts()" id="formB">
+            <table id="ptsTab">
+                <tr>
+                    <th>From X</th>
+                    <th>From Y</th>
+                    <th>To X</th>
+                    <th>To Y</th>
+                </tr>
+            </table>
+            <input type="reset" value="That's wrong"><br>
+            Time: <input type="number" name="time" id="dataVel"><br>
+            <input type="submit" value="Submit">
+        </form>
+      </div>
+
+      <button class="openbtn" id="leftPanelBtn" onclick="toggleLeftPanel()" style="left: 0">Log ></button>
+      <button class="openbtn" id="rightPanelBtn" onclick="toggleRightPanel()" style="right: 0">< Data</button>
+      <script src="https://www.geogebra.org/apps/deployggb.js"></script>
+      <div id="graph"></div>
+      <script>
+        const width  = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+        const height = window.innerHeight|| document.documentElement.clientHeight|| document.body.clientHeight;
+        function onInit() {
+            logData("Loaded GeoGerba graph system");
+            graphApp.evalCommand("ZoomIn(-1.5, -1.5, 23, 12)");
+            registerMsgCall("dronePos", function(data) {
+            	document.getElementById("formA")[3].value = data.x;
+            	document.getElementById("formA")[4].value = data.y;
+            	document.getElementById("formA")[5].value = data.z;
+            	graphApp.evalCommand("masterDrone = Point({"+data.x+","+data.y+"})");
+            }, true);
+            //Websocket calls here are bad practice, as they block
+            //the graph from loading. Move this elsewhere.
+            sendData({method: "getDronePos"});
+        }
+        var ggbApp = new GGBApplet({id: "graphApp", appName: "graphing", "width": width, "height": height-78, showToolBar: true, customToolBar: "0 15 6 , 40 41 42", showResetIcon: true, appletOnLoad: onInit, country: "US"}, '5.0');
+        window.addEventListener("load", function() { 
+            ggbApp.inject('graph');
+        });
+      </script>
+    </div>
+  </body>
+</html>

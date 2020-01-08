@@ -38,7 +38,7 @@ class Shape(object):
         Y = float(input("What is the final Y point of the Master Drone?: "))
         MPOSB[1] = Y
         self.MBY = Y
-        Z = float(input("What is the final X point of the Master Drone?: "))
+        Z = float(input("What is the final Z point of the Master Drone?: "))
         MPOSB[2] = Z
         self.MBZ = Z
         print("The swarm will fly to this Point B: ("+",".join(map(str, MPOSB))+")")
@@ -112,6 +112,11 @@ class Shape(object):
     # checkFormation DECLARED?
     def setNumDrones(self):
         self.numDrones = int(input("How many drones are there? "))
+        if self.numDrones == 1:
+            #I hate this
+            c = Circle()
+            self.__class__ = c.__class__
+            self.__dict__ = c.__dict__
         return self.numDrones
 
     def checkFormation(self, numDrones):
@@ -120,4 +125,11 @@ class Shape(object):
     def printShriKishoriKishore(self):
         raise NotImplementedError
 
-#  end of class
+# ask radius of pcta/deca/hexa gon..
+# ask # of drones DONE IN SHAPE PARENT CLASS
+class Circle(Shape):
+    def printShriKishoriKishore(self):
+        print("ShriKishoriKishore")
+
+    def checkFormation(self, numDrones):
+        return True
