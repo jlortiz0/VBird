@@ -187,15 +187,15 @@
           }
           
           function logData(data) {
-            document.getElementById("logArea").textContent += "[" + getTimestamp() + "] " + data + "\n"
+            document.getElementById("logArea").textContent += "[" + getTimestamp() + "] " + data + "\n";
           }
-          logData("Page Loaded")
+          logData("Page Loaded");
 
           function toggle2D3D() {
             if (document.getElementById("2D3Dswitch").textContent == "2D Top View") {
-              document.getElementById("2D3Dswitch").textContent = "3D View"
+              document.getElementById("2D3Dswitch").textContent = "3D View";
             } else {
-              document.getElementById("2D3Dswitch").textContent = "2D Top View"
+              document.getElementById("2D3Dswitch").textContent = "2D Top View";
             }
           }
         </script>
@@ -203,17 +203,40 @@
       <div id="rightSidePanel" class="sidepanel" style="right: 0">
         <script>
             function getFlightPts() {
+            	if (!graphApp.exists("A")) {
+            		alert("Please make a segment from masterDrone to point A");
+            		return;
+            	}
                 var f = document.getElementById("formA");
-                if (f[2].value == f[5].value && f[3].value == f[6].value && f[4].value == f[7].value) {
-                    alert("Point A and Point B cannot be the same!");
-                    return;
-                }
                 var request = {shape: f[0].value}
-                request["count"] = f[1].value;
-                request["distBetween"] = f[2].value;
-                request["targetPoint"] = [f[6].value, f[7].value, f[8].value];
-                request["method"] = "getPoints";
+                request["count"] = f[1].valueAsNumber;
+                request["dist"] = f[2].valueAsNumber;
+                request["target"] = [f[6].valueAsNumber, f[7].valueAsNumber, f[8].valueAsNumber];
+                line = graphApp.evalCommandGetLabels("Line(masterDrone, A)");
+                request["line"] = graphApp.getValueString(line);
+                graphApp.deleteObject(line);
+                request["method"] = "calcPoints";
                 registerMsgCall("pointsList", function(data) {
+                	var graphObj = ["masterDrone"];
+                	var graphObj2 = ["A"];
+                	if (!graphApp.exists("A")) {
+                		graphObj2[0] = "B";
+                	}
+                	var row = document.getElementById("ptsTab").insertRow(1);
+                	row.insertCell(0).innerHTML = "masterDrone";
+                	row.insertCell(1).innerHTML = f[3].value+","+f[4].value;
+                	row.insertCell(2).innerHTML = f[6].value+","+f[7].value;
+                	for (var i=1; i<data.points.length; i++) {
+                		graphObj.push(graphApp.evalCommandGetLabels("drone"+i+" = Point({"+data.points[i][0].join()+"})"));
+                		graphObj2.push(graphApp.evalCommandGetLabels("droneT"+i+" = Point({"+data.points[i][1].join()+"})"));
+                		graphApp.evalCommand("Segment(drone"+i+",droneT"+i+")");
+                		row = document.getElementById("ptsTab").insertRow(i+1);
+                		row.insertCell(0).innerHTML = "drone"+i;
+                		row.insertCell(1).innerHTML = data.points[i][0].join();
+                		row.insertCell(2).innerHTML = data.points[i][1].join();
+                	}
+                	graphApp.evalCommand("Polygon("+graphObj.join()+")");
+                	graphApp.evalCommand("Polygon("+graphObj2.join()+")");
                 	f.style.display = "none";
                 	document.getElementById("formB").style.display = "block";
             	}, true);
@@ -251,15 +274,14 @@
         <form style="display: none" novalidate onreset="delFlightPts()" id="formB">
             <table id="ptsTab">
                 <tr>
-                    <th>From X</th>
-                    <th>From Y</th>
-                    <th>To X</th>
-                    <th>To Y</th>
+                	<th>Name</th>
+                    <th>From</th>
+                    <th>To</th>
                 </tr>
             </table>
             <input type="reset" value="That's wrong"><br>
-            Time: <input type="number" name="time" id="dataVel"><br>
-            <input type="submit" value="Submit">
+            Max velocity (0 for none): <input type="number" name="velMax" id="dataVel"><br>
+            <input type="submit" value="Go">
         </form>
       </div>
 
@@ -270,20 +292,33 @@
       <script>
         const width  = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
         const height = window.innerHeight|| document.documentElement.clientHeight|| document.body.clientHeight;
-        function onInit() {
+        function onGraphUpdate(object) {
+        	if (object == "A") {
+        		var f = document.getElementById("formA");
+        		f[6].value = graphApp.getXcoord("A");
+        		f[7].value = graphApp.getYcoord("A");
+        	} else if (object == "B" && !graphApp.exists("A")) {
+        		var f = document.getElementById("formA");
+        		f[6].value = graphApp.getXcoord("B");
+        		f[7].value = graphApp.getYcoord("B");
+        	}
+        }
+        function onGraphInit() {
             logData("Loaded GeoGerba graph system");
             graphApp.evalCommand("ZoomIn(-1.5, -1.5, 23, 12)");
             registerMsgCall("dronePos", function(data) {
-            	document.getElementById("formA")[3].value = data.x;
-            	document.getElementById("formA")[4].value = data.y;
-            	document.getElementById("formA")[5].value = data.z;
+            	var f = document.getElementById("formA");
+            	f[3].value = data.x;
+            	f[4].value = data.y;
+            	f[5].value = data.z;
             	graphApp.evalCommand("masterDrone = Point({"+data.x+","+data.y+"})");
-            }, true);
+            });
             //Websocket calls here are bad practice, as they block
             //the graph from loading. Move this elsewhere.
             sendData({method: "getDronePos"});
+            graphApp.registerAddListener("onGraphUpdate");
         }
-        var ggbApp = new GGBApplet({id: "graphApp", appName: "graphing", "width": width, "height": height-78, showToolBar: true, customToolBar: "0 15 6 , 40 41 42", showResetIcon: true, appletOnLoad: onInit, country: "US"}, '5.0');
+        var ggbApp = new GGBApplet({id: "graphApp", appName: "classic", "width": width, "height": height-78, showToolBar: true, customToolBar: "15 6 40 41 42", appletOnLoad: onGraphInit, country: "US"}, '5.0');
         window.addEventListener("load", function() { 
             ggbApp.inject('graph');
         });
