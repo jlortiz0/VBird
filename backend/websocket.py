@@ -20,15 +20,19 @@ async def connection_handler(sock, _):
                 if msg["line"][1] == ':':
                     msg["line"] = msg["line"][3:]
                 msg["line"] = msg["line"].split(' ')
-                persist["slope"] = float(msg["line"][0][:-1])/float(msg["line"][4])
-                persist["yint"] = float(msg["line"][2][:-1])/float(msg["line"][4])
+                print(msg["line"])
+                persist["slope"] = -float(msg["line"][0][:-1])/float(msg["line"][2][:-1])
+                persist["yint"] = float(msg["line"][4])/float(msg["line"][2][:-1])
                 output = [("master", msg["target"])]
+                output.append([(1, 1+msg["dist"]), (msg["target"][0], msg["target"][1]+msg["dist"])])
+                output.append([(1+msg["dist"], 1+msg["dist"]), (msg["target"][0]+msg["dist"], msg["target"][1]+msg["dist"])])
+                output.append([(1+msg["dist"], 1), (msg["target"][0]+msg["dist"], msg["target"][1])])
                 #JS float parsing sucks, so I do the rounding here
                 #Ideally the server should keep the floats and send back rounded
                 #numbers to the client
-                output.append(((1, 1+msg["dist"]), (msg["target"][0], msg["target"][1]+msg["dist"])))
-                output.append(((1+msg["dist"], 1+msg["dist"]), (msg["target"][0]+msg["dist"], msg["target"][1]+msg["dist"])))
-                output.append(((1+msg["dist"], 1), (msg["target"][0]+msg["dist"], msg["target"][1])))
+                for x in output[1:]:
+                    for y in range(len(x)):
+                        x[y] = tuple(map(lambda z: round(z, 2), x[y]))
                 await sock.send(json.dumps({
                     "method":   "pointsList",
                     "points":   output
@@ -67,11 +71,9 @@ class RealTimeLog:
         self.slope = 1
         self.yint = 0
         if platform.system() == 'Windows':
-            self.port = serial.Serial("COM3", 115200)
+            self.port = serial.Serial("COM4", 115200)
         else:
             self.port = serial.Serial('/dev/ttyUSB0', 115200)
-        self.port.write(b'\n\nlec\n')
-        self.port.flush()
         self.total = -2
         self.deviate = 0
         self.sock = None
@@ -98,18 +100,23 @@ class RealTimeLog:
         self.sock = sock
 
     async def run(self):
+        await asyncio.sleep(1)
+        self.port.write(b'reset\r\n\r\n')
+        await asyncio.sleep(2)
+        self.port.write(b'lep\n')
+        self.port.flush()
+        await asyncio.sleep(0.25)
+        self.port.reset_input_buffer()
         while True:
-            if not self.port.isopen():
-                break
             while self.port.in_waiting:
-                data = self.port.readline().split(',')
-                if data[0] == 'DIST' and 'POS' in data:
-                    data = tuple(map(float, data[data.index('POS')+1:][:3]))
-                    intended = SLOPE * data[0] + YINT
-                    if abs(data[1]-intended) > TOLERANCE:
-                        print("Anomaly detected! "+str(round(data[1]-intended, 3))+" units off!", end='\r')
+                data = self.port.read_until().decode().split(',')
+                if data[0] == "POS":
+                    data = tuple(map(float, data[2:5]))
+                    intended = self.slope * data[1] + self.yint
+                    if abs(data[2]-intended) > TOLERANCE:
+                        print("Anomaly detected! "+str(round(data[2]-intended, 3))+" m off!")
                     else:
-                        print("On track.", end='\r')
+                        print("On track.")
                     if self.sock:
                         await self.sock.send(json.dumps({
                             "method":   "dronePos",
@@ -117,15 +124,16 @@ class RealTimeLog:
                             "y":        data[1],
                             "z":        data[2]
                         }))
-                    self.deviate += data[1]-intended
+                    self.deviate += data[2]-intended
                     self.total += 1
             await asyncio.sleep(0.5)
+            
 
 RTLOG = RealTimeLog()
 signal.signal(signal.SIGINT, signal.default_int_handler)
 start_server = websockets.serve(connection_handler, "localhost", 7777)
 asyncio.ensure_future(start_server)
-asyncio.ensure_future(RTLOG)
+asyncio.ensure_future(RTLOG.run())
 try:
     asyncio.get_event_loop().run_forever()
 except KeyboardInterrupt:

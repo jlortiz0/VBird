@@ -194,8 +194,10 @@
           function toggle2D3D() {
             if (document.getElementById("2D3Dswitch").textContent == "2D Top View") {
               document.getElementById("2D3Dswitch").textContent = "3D View";
+              graphApp.enable3D(true);
             } else {
               document.getElementById("2D3Dswitch").textContent = "2D Top View";
+              graphApp.enable3D(false);
             }
           }
         </script>
@@ -318,7 +320,7 @@
             sendData({method: "getDronePos"});
             graphApp.registerAddListener("onGraphUpdate");
         }
-        var ggbApp = new GGBApplet({id: "graphApp", appName: "classic", "width": width, "height": height-78, showToolBar: true, customToolBar: "15 6 40 41 42", appletOnLoad: onGraphInit, country: "US"}, '5.0');
+        var ggbApp = new GGBApplet({id: "graphApp", appName: "classic", "width": width, "height": height-78, showToolBar: true, customToolBar: "15 6 40 41 42 1", appletOnLoad: onGraphInit, country: "US"}, '5.0');
         window.addEventListener("load", function() { 
             ggbApp.inject('graph');
         });
