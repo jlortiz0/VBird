@@ -129,6 +129,14 @@
           document.getElementById("rightPanelBtn").style.cursor = "e-resize";
           document.getElementById("rightPanelBtn").textContent = ">";
         }
+        const f = document.getElementById("formA");
+        if (graphApp.exists("A")) {
+	      f[6].value = graphApp.getXcoord("A");
+	   	  f[7].value = graphApp.getYcoord("A");
+	    } else if (graphApp.exists("B")) {
+	      f[6].value = graphApp.getXcoord("B");
+	      f[7].value = graphApp.getYcoord("B");
+	  	}
       }
 
       
@@ -205,11 +213,17 @@
       <div id="rightSidePanel" class="sidepanel" style="right: 0">
         <script>
             function getFlightPts() {
-            	if (!graphApp.exists("A")) {
-            		alert("Please make a segment from masterDrone to point A");
-            		return;
-            	}
-                var f = document.getElementById("formA");
+            	const f = document.getElementById("formA");
+            	if (graphApp.exists("A")) {
+	        		f[6].value = graphApp.getXcoord("A");
+	        		f[7].value = graphApp.getYcoord("A");
+	        	} else if (graphApp.exists("B")) {
+	        		f[6].value = graphApp.getXcoord("B");
+	        		f[7].value = graphApp.getYcoord("B");
+	        	} else {
+	        		alert("Please draw a line on the graph");
+	        		return;
+	        	}
                 var request = {shape: f[0].value}
                 request["count"] = f[1].valueAsNumber;
                 request["dist"] = f[2].valueAsNumber;
@@ -246,7 +260,6 @@
             }
 
             function delFlightPts() {
-                sendData({method: "delPts"});
                 document.getElementById("formB").style.display = "none";
                 document.getElementById("formA").style.display = "block";
                 while (document.getElementById("ptsTab").rows.length>1) {
@@ -295,12 +308,11 @@
         const width  = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
         const height = window.innerHeight|| document.documentElement.clientHeight|| document.body.clientHeight;
         function onGraphUpdate(object) {
+	        const f = document.getElementById("formA");
         	if (object == "A") {
-        		var f = document.getElementById("formA");
         		f[6].value = graphApp.getXcoord("A");
         		f[7].value = graphApp.getYcoord("A");
         	} else if (object == "B" && !graphApp.exists("A")) {
-        		var f = document.getElementById("formA");
         		f[6].value = graphApp.getXcoord("B");
         		f[7].value = graphApp.getYcoord("B");
         	}
@@ -309,7 +321,7 @@
             logData("Loaded GeoGerba graph system");
             graphApp.evalCommand("ZoomIn(-1.5, -1.5, 23, 12)");
             registerMsgCall("dronePos", function(data) {
-            	var f = document.getElementById("formA");
+            	const f = document.getElementById("formA");
             	f[3].value = data.x;
             	f[4].value = data.y;
             	f[5].value = data.z;

@@ -108,26 +108,32 @@ class RealTimeLog:
         await asyncio.sleep(0.25)
         self.port.reset_input_buffer()
         while True:
+            avg = [0, 0, 0]
+            count = 0
             while self.port.in_waiting:
                 data = self.port.read_until().decode().split(',')
                 if data[0] == "POS":
-                    data = tuple(map(float, data[2:5]))
-                    intended = self.slope * data[1] + self.yint
-                    if abs(data[2]-intended) > TOLERANCE:
-                        print("Anomaly detected! "+str(round(data[2]-intended, 3))+" m off!")
-                    else:
-                        print("On track.")
-                    if self.sock:
-                        await self.sock.send(json.dumps({
-                            "method":   "dronePos",
-                            "x":        data[0],
-                            "y":        data[1],
-                            "z":        data[2]
-                        }))
-                    self.deviate += data[2]-intended
-                    self.total += 1
-            await asyncio.sleep(0.5)
-            
+                    data = tuple(map(float, data[2:6]))
+                    #[identifier, x, y]
+                    for i in range(len(data)-1):
+                        avg[i] += data[i-1]
+                    count += 1
+            avg = tuple(map(lambda x: x/count, avg))
+            intended = self.slope * avg[0] + self.yint
+            if abs(avg[1]-intended) > TOLERANCE:
+                print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")
+            else:
+                print("On track.")
+            if self.sock:
+                await self.sock.send(json.dumps({
+                    "method":   "dronePos",
+                    "x":        avg[0],
+                    "y":        avg[1],
+                    "z":        avg[2]
+                }))
+            self.deviate += avg[1]-intended
+            self.total += 1
+            await asyncio.sleep(0.25)           
 
 RTLOG = RealTimeLog()
 signal.signal(signal.SIGINT, signal.default_int_handler)
