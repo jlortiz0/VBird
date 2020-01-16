@@ -226,7 +226,7 @@
                 				graphApp.evalCommand(graphObj[0]+"drone"+j+"Seg = Segment("+graphObj[j]+","+prevGraphObj[j]+")");
                 			}
                 		}
-                		graphApp.evalCommand("Polygon("+graphObj.join()+")");
+                		graphApp.evalCommand("dronePoly"+i+" = Polygon("+graphObj.join()+")");
                 		prevGraphObj = graphObj;
                 	}
                 	f.style.display = "none";
@@ -239,6 +239,12 @@
             function delFlightPts() {
                 document.getElementById("formB").style.display = "none";
                 document.getElementById("formA").style.display = "block";
+                var graphObj = graphApp.getAllObjectNames();
+                for (var i=0; i<graphObj.length; i++) {
+                	if (graphObj[i].includes("drone")) {
+                		graphApp.deleteObject(graphObj[i]);
+                	}
+                }
             }
         </script>
         <h4 style="margin: 16px">Flight Planner:</h4>

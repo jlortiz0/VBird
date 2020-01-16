@@ -8,8 +8,9 @@ import asyncio
 import traceback
 import serial
 import websockets
+import serial.tools.list_ports
 
-persist = {}
+persist = {"lines":[]}
 async def connection_handler(sock, _):
     try:
         while True:
@@ -18,10 +19,11 @@ async def connection_handler(sock, _):
             msg = json.loads(msg)
             if msg["method"] == "calcPoints":
                 lines = []
-                for x in msg["line"]:
+                for i,x in enumerate(msg["lines"]):
                     x = x.split(' ')
                     lines.append((-float(x[0][:-1])/float(x[2][:-1]),
-                                  float(x[4])/float(x[2][:-1])))
+                                  float(x[4])/float(x[2][:-1]),
+                                  msg["points"][i+1][0]))
                 persist["lines"] = lines
                 output = []
                 d = msg["dist"]
@@ -36,7 +38,7 @@ async def connection_handler(sock, _):
                     }))
             elif msg["method"] == "start":
                 RTLOG.set_sock(sock)
-                RTLOG.set_and_reset(persist["slope"], persist["yint"])
+                RTLOG.reset()
             elif msg["method"] == "getDronePos":
                 await sock.send(json.dumps({
                     "method":   "dronePos",
@@ -65,21 +67,12 @@ def build_err(msg, code):
 TOLERANCE = 0.005
 class RealTimeLog:
     def __init__(self):
-        self.slope = 1
-        self.yint = 0
-        if platform.system() == 'Windows':
-            self.port = serial.Serial("COM4", 115200)
-        else:
-            self.port = serial.Serial('/dev/ttyUSB0', 115200)
+        self.port = serial.Serial(serial.tools.list_ports.comports()[0].device, 115200)
         self.total = -2
         self.deviate = 0
         self.sock = None
         self.masterSerial = None
         self.masterPos = (0, 0, 0)
-
-    def set_eqn(self, slope, yint):
-        self.slope = slope
-        self.yint = yint
 
     def stdev(self):
         return math.sqrt(self.deviate**2/total)
@@ -90,10 +83,6 @@ class RealTimeLog:
         self.deviate = 0
         self.port.reset_input_buffer()
         return stdev
-
-    def set_and_reset(self, slope, yint):
-        self.set_eqn(slope, yint)
-        return self.reset()
 
     def set_sock(self, sock=None):
         self.sock = sock
@@ -116,25 +105,29 @@ class RealTimeLog:
                     data = tuple(map(float, data[2:6]))
                     #[identifier, x, y, z]
                     if self.masterSerial == data[0]:
-                        self.masterPos = data[1:]
+                        pass
                     for i in range(len(data)-1):
                         avg[i] += data[i+1]
                     count += 1
             avg = tuple(map(lambda x: x/count, avg))
-            intended = self.slope * avg[0] + self.yint
-            if abs(avg[1]-intended) > TOLERANCE:
-                print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")
-            else:
-                print("On track.")
-            if self.sock:
+            if self.sock and self.masterPos != avg:
                 await self.sock.send(json.dumps({
                     "method":   "dronePos",
                     "x":        avg[0],
                     "y":        avg[1],
                     "z":        avg[2]
                 }))
-            self.deviate += avg[1]-intended
-            self.total += 1
+            self.masterPos = avg
+            if persist["lines"]:
+	            intended = persist["lines"][0][0] * avg[0] + persist["lines"][0][1]
+	            if abs(avg[1]-intended) > TOLERANCE:
+	                print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")
+	            else:
+	                print("On track.")
+	                if avg[0] == persist["lines"][0][2]:
+	                	del persist["lines"][0]
+	            self.deviate += avg[1]-intended
+	            self.total += 1
             await asyncio.sleep(0.25)           
 
 RTLOG = RealTimeLog()
