@@ -3,7 +3,6 @@
 import json
 import math
 import signal
-import platform
 import asyncio
 import traceback
 import serial
@@ -21,6 +20,7 @@ async def connection_handler(sock, _):
                 lines = []
                 for i,x in enumerate(msg["lines"]):
                     x = x.split(' ')
+                    #(slope, yint, targetX)
                     lines.append((-float(x[0][:-1])/float(x[2][:-1]),
                                   float(x[4])/float(x[2][:-1]),
                                   msg["points"][i+1][0]))
@@ -32,11 +32,13 @@ async def connection_handler(sock, _):
                     output[-1].append((point[0]+d, point[1]))
                     output[-1].append((point[0]+d, point[1]+d))
                     output[-1].append((point[0], point[1]+d))
+                persist["height"] = msg["height"]
                 await sock.send(json.dumps({
                     "method":   "pointsList",
                     "points":   output
                     }))
             elif msg["method"] == "start":
+                persist["vel"] = msg["vel"]
                 RTLOG.set_sock(sock)
                 RTLOG.reset()
             elif msg["method"] == "getDronePos":
@@ -71,27 +73,40 @@ class RealTimeLog:
         self.total = -2
         self.deviate = 0
         self.sock = None
-        self.masterSerial = None
+        self.masterSerial = "ABCD"
         self.masterPos = (0, 0, 0)
+        self.debug = False
 
     def stdev(self):
-        return math.sqrt(self.deviate**2/total)
+        return math.sqrt(self.deviate**2/self.total)
     
     def reset(self):
         stdev = self.stdev()
         self.total = -2
         self.deviate = 0
         self.port.reset_input_buffer()
+        if self.debug:
+            if persist["lines"]:
+                msg = "in {} {} "+str(persist["vel"])+" "+str(persist["height"])+"\n"
+                msg = msg.format(persist["lines"][0][0], persist["lines"][0][1])
+                self.port.write(msg.encode())
+            else:
+                self.port.write(b'reset\r\nlep\n')
+            self.port.flush()
+            self.port.reset_input_buffer()
         return stdev
 
     def set_sock(self, sock=None):
         self.sock = sock
 
     async def run(self):
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         self.port.write(b'reset\r\n\r\n')
         self.port.flush()
         await asyncio.sleep(2)
+        if (self.port.read(2) == b'jj'):
+            print("Debug mode")
+            self.debug = True
         self.port.write(b'lep\n')
         self.port.flush()
         await asyncio.sleep(0.25)
@@ -102,13 +117,15 @@ class RealTimeLog:
             while self.port.in_waiting:
                 data = self.port.read_until().decode().split(',')
                 if data[0] == "POS":
-                    data = tuple(map(float, data[2:6]))
+                    data = (data[2],)+tuple(map(float, data[3:6]))
                     #[identifier, x, y, z]
                     if self.masterSerial == data[0]:
-                        pass
-                    for i in range(len(data)-1):
-                        avg[i] += data[i+1]
-                    count += 1
+                        for i in range(len(data)-1):
+                            avg[i] += data[i+1]
+                        count += 1
+            if not count:
+                await asyncio.sleep(0.25)
+                continue
             avg = tuple(map(lambda x: x/count, avg))
             if self.sock and self.masterPos != avg:
                 await self.sock.send(json.dumps({
@@ -119,15 +136,16 @@ class RealTimeLog:
                 }))
             self.masterPos = avg
             if persist["lines"]:
-	            intended = persist["lines"][0][0] * avg[0] + persist["lines"][0][1]
-	            if abs(avg[1]-intended) > TOLERANCE:
-	                print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")
-	            else:
-	                print("On track.")
-	                if avg[0] == persist["lines"][0][2]:
-	                	del persist["lines"][0]
-	            self.deviate += avg[1]-intended
-	            self.total += 1
+                intended = persist["lines"][0][0] * avg[0] + persist["lines"][0][1]
+                self.deviate += avg[1]-intended
+                self.total += 1
+                if abs(avg[1]-intended) > TOLERANCE:
+                    print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")
+                else:
+                    print("On track.")
+                    if avg[0] >= persist["lines"][0][2]:
+                        del persist["lines"][0]
+                        print("Line completed. Average deviation "+str(self.reset()))
             await asyncio.sleep(0.25)           
 
 RTLOG = RealTimeLog()

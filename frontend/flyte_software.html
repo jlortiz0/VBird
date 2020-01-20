@@ -207,7 +207,7 @@
 	        		alert("Please draw a line on the graph");
 	        		return;
 	        	}
-                var request = {shape: f[0].value, count: f[1].valueAsNumber, dist: f[2].valueAsNumber, method: "calcPoints", points: [], lines: []};
+                var request = {shape: f[0].value, count: f[1].valueAsNumber, dist: f[2].valueAsNumber, method: "calcPoints", points: [], lines: [], "height": f[8].valueAsNumber};
                 for (var i=0; i<pts.length; i++) {
                 	request.points.push([graphApp.getXcoord(pts[i]), graphApp.getYcoord(pts[i]), graphApp.getZcoord(pts[i]) || f[8].valueAsNumber, pts[i]]);
                 	if (i) {
@@ -246,6 +246,22 @@
                 	}
                 }
             }
+
+            function startTheDrones() {
+            	var graphObj = graphApp.getAllObjectNames();
+                for (var i=0; i<graphObj.length; i++) {
+                	if (graphObj[i].includes("drone")) {
+                		graphApp.deleteObject(graphObj[i]);
+                	}
+                }
+            	var vel = document.getElementById("dataVel");
+            	if (vel.valueAsNumber > 3) {
+            		vel.value = 3;
+            	} else if (vel.valueAsNumber < 0) {
+            		vel.value = 0;
+            	}
+            	sendData({method: "start", "vel": vel.valueAsNumber || 3});
+            }
         </script>
         <h4 style="margin: 16px">Flight Planner:</h4>
         <form novalidate onsubmit="getFlightPts()" id="formA" action="javascript:void(0);">
@@ -266,10 +282,10 @@
             Target height: <input type="number" name="pBZ" value=5><br>
             <input type="submit" value="Submit">
         </form>
-        <form style="display: none" novalidate onreset="delFlightPts()" id="formB">
+        <form style="display: none" novalidate onreset="delFlightPts()" id="formB" onsubmit="startTheDrones()" action="javascript:void(0);">
             Please look at the graph and ensure that all flight paths are correct. <br>
             <input type="reset" value="That's wrong"><br>
-            Max velocity (0 for none): <input type="number" name="velMax" id="dataVel"><br>
+            Max velocity (0 for none): <input type="number" name="velMax" id="dataVel" value=0><br>
             <input type="submit" value="Go">
         </form>
       </div>
