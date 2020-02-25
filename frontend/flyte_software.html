@@ -167,11 +167,26 @@
       }
       registerMsgCall("logData", function(data) {logData(data.message);});
       registerMsgCall("error", function(data) {alert(data.message);});
+
+      function emergencyStop() {
+      	sendData({method:"emer"});
+      }
+
+      function anomaly() {
+      	var dirs = ["left", "right", "forward", "back"];
+      	sendData({
+      		method: "anomaly",
+      		dir: dirs[Math.floor(Math.random() * 4)],
+      		amt: 100
+      	});
+      }
     </script>
   </head>
   <body>
 
     <div class="navbar">
+   	  <button style="float:left" onclick="emergencyStop()">STOP</button>
+   	  <button style="float:left" onclick="anomaly()">ANOMALY</button>
       <p>FLYTE SOFTWARE</p>
     </div>
 
