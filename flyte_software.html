@@ -128,7 +128,7 @@
         const f = document.getElementById("formA");
         pts = graphApp.getAllObjectNames("point");
         pts = pts.filter(function(val, ind, arr) {
-        	return val != "masterDrone";
+        	return !val.toLowerCase().includes("drone");
         });
         if (pts.length) {
 	        f[6].value = graphApp.getXcoord(pts[pts.length-1]);
@@ -173,7 +173,7 @@
       }
 
       function anomaly() {
-      	var dirs = ["left", "right", "forward", "back"];
+      	const dirs = ["left", "right", "forward", "back"];
       	sendData({
       		method: "anomaly",
       		dir: dirs[Math.floor(Math.random() * 4)],
@@ -185,8 +185,11 @@
   <body>
 
     <div class="navbar">
-   	  <button style="float:left" onclick="emergencyStop()">STOP</button>
-   	  <button style="float:left" onclick="anomaly()">ANOMALY</button>
+    	<div style="float:left;padding:5px;display:none", id="debugDiv">
+	   	  <button onclick="emergencyStop()">STOP</button>
+	   	  <button onclick="anomaly()">ANOMALY</button>
+	   	  <input type="checkbox" style="float:left" id="debugDroneOnlyBox">
+        </div>
       <p>FLYTE SOFTWARE</p>
     </div>
 
@@ -208,6 +211,9 @@
             document.getElementById("logArea").textContent += "[" + getTimestamp() + "] " + data + "\n";
           }
           logData("Page Loaded");
+          if (window.location.protocol == "file:") {
+          	document.getElementById("debugDiv").style.display = "block";
+          }
         </script>
       </div>
       <div id="rightSidePanel" class="sidepanel" style="right: 0">
@@ -248,6 +254,10 @@
                 	document.getElementById("formB").style.display = "block";
             	}, true);
             	logData("Sent "+request.points.length+" points to backend");
+            	if (document.getElementById("debugDroneOnlyBox").checked) {
+            		logData("WARNING: Drone only debug mode enabled! Scripts may act strangely!");
+            		request.justDrone = true;
+            	}
                 sendData(request);
             }
 
@@ -269,13 +279,13 @@
                 		graphApp.deleteObject(graphObj[i]);
                 	}
                 }
-            	var vel = document.getElementById("dataVel");
-            	if (vel.valueAsNumber > 3) {
-            		vel.value = 3;
-            	} else if (vel.valueAsNumber < 0) {
-            		vel.value = 0;
+            	var vel = document.getElementById("dataVel").valueAsNumber;
+            	if (vel > 3) {
+            		vel = 3;
+            	} else if (vel < 0) {
+            		vel = 0;
             	}
-            	sendData({method: "start", "vel": vel.valueAsNumber || 3});
+            	sendData({method: "start", "vel": vel || 3});
             }
         </script>
         <h4 style="margin: 16px">Flight Planner:</h4>

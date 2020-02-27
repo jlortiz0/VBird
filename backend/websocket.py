@@ -38,10 +38,13 @@ async def connection_handler(sock, _):
                     "method":   "pointsList",
                     "points":   output
                     }))
+                if "justDrone" in msg:
+                    asyncio.ensure_future(droneByItself())
             elif msg["method"] == "start":
                 persist["vel"] = msg["vel"]
                 RTLOG.set_sock(sock)
                 RTLOG.reset()
+                await RTLOG.drone.takeoff()
             elif msg["method"] == "getDronePos":
                 await sock.send(json.dumps({
                     "method":   "dronePos",
@@ -71,6 +74,31 @@ def build_err(msg, code):
     print("Error: "+msg+"\nCode: "+str(code))
     return "{{\"method\": \"error\", \"message\": \"{0}\", \"code\": {1}}}".format(msg, code)
 
+async def droneByItself():
+    drone = RTLOG.drone
+    await drone.takeoff()
+    dsty = 100 * (persist["lines"][0][0] * avg[0] + persist["lines"][0][1])
+    dstx = 100 * persist["lines"][0][2]
+    #Intended height and current height
+    intH = persist["height"] * 100
+    curH = await self.drone.get_height()
+    if abs(intH - curH) > 50:
+        drone.send_rc_control(0, 0, max(min(abs(intH - curH), 100), -100), 0)
+    elif math.hypot(dsty, dstx) > 50:
+        if abs(dstx) < abs(dsty):
+            #Calculate the tangent of the triangle formed by dst and dsty
+            tan = math.copysign(dstx/dsty, dstx)
+            #Find the side lengths of similar triangle with the longest side as 100
+            #Make sure that we round off as the function only accepts int
+            #Copy signs to ensure we go the right direction
+            self.drone.send_rc_control(round(tan*100), int(math.copysign(100, dsty)), 0, 0)
+        else:
+            tan = math.copysign(dsty/dstx, dsty)
+            self.drone.send_rc_control(int(math.copysign(100, dstx), round(tan*100), 0, 0)
+    await asyncio.sleep(1)
+    drone.send_rc_control(0, 0, 0, 0)
+    await drone.land()
+
 TOLERANCE = 0.25
 class RealTimeLog:
     def __init__(self):
@@ -78,14 +106,17 @@ class RealTimeLog:
         self.total = 0
         self.deviate = 0
         self.sock = None
-        self.masterSerial = "ABCD"
+        #self.masterSerial = "ABCD"
         self.masterPos = (0, 0, 0)
         self.drone = Tello()
+        self.log = open('logs/rtserial.log', 'w')
+        self.time = time.time()
+        self.log.write('time x y intendY\n')
 
     def stdev(self):
-    	final = 0
-    	for x in self.deviate:
-    		final += math.sqrt(x**2/self.total)
+        final = 0
+        for x in self.deviate:
+            final += math.sqrt(x**2/self.total)
         return final
 
     async def anomaly(self, direct, amt):
@@ -96,6 +127,7 @@ class RealTimeLog:
         self.total = 0
         self.deviate = []
         self.port.reset_input_buffer()
+        self.log.flush()
         return stdev
 
     def set_sock(self, sock=None):
@@ -119,10 +151,10 @@ class RealTimeLog:
                 if data[0] == "POS":
                     data = (data[2],)+tuple(map(float, data[3:6]))
                     #[identifier, x, y, z]
-                    if self.masterSerial == data[0]:
-                        for i in range(len(data)-1):
-                            avg[i] += data[i+1]
-                        count += 1
+                    #if self.masterSerial == data[0]:
+                    for i in range(len(data)-1):
+                        avg[i] += data[i+1]
+                    count += 1
             if not count:
                 await asyncio.sleep(0.25)
                 continue
@@ -135,8 +167,9 @@ class RealTimeLog:
                     "z":        avg[2]
                 }))
             self.masterPos = avg
-            if persist["lines"]:
+            if persist["lines"] and self.sock:
                 intended = persist["lines"][0][0] * avg[0] + persist["lines"][0][1]
+                self.log.write('{:.3f} {:.3f} {:.3f} {:.3f}\n'.format(time.time()-self.time, avg[0], avg[1], intended))
                 self.deviate.append(abs(intended - avg[1]))
                 self.total += 1
                 #Setup some vars to make it more readable
@@ -149,16 +182,18 @@ class RealTimeLog:
                 curH = await self.drone.get_height()
                 #Try to normalize height first
                 if abs(intH - curH) > 50:
-                    await self.drone.send_rc_control(0, 0, max(min(abs(intH - curH), 100), -100), 0)
+                    self.drone.send_rc_control(0, 0, max(min(abs(intH - curH), 100), -100), 0)
                 elif math.hypot(dsty, dstx) > 50:
-                    if dstx < dsty:
+                    if abs(dstx) < abs(dsty):
                         #Calculate the tangent of the triangle formed by dst and dsty
-                        tan = dstx/dsty
+                        tan = math.copysign(dstx/dsty, dstx)
                         #Find the side lengths of similar triangle with the longest side as 100
-                        self.drone.send_rc_control(tan*100, 100, 0, 0)
+                        #Make sure that we round off as the function only accepts int
+                        #Copy signs to ensure we go the right direction
+                        self.drone.send_rc_control(round(tan*100), int(math.copysign(100, dsty))0, 0, 0)
                     else:
-                        tan = dsty/dstx
-                        self.drone.send_rc_control(100, tan*100, 0, 0)
+                        tan = math.copysign(dsty/dstx, dsty)
+                        self.drone.send_rc_control(int(math.copysign(100, dstx), round(tan*100), 0, 0)
                 #Return to using m
                 if abs(avg[1] - intended) > TOLERANCE:
                     print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")
@@ -181,3 +216,4 @@ try:
     asyncio.get_event_loop().run_forever()
 except KeyboardInterrupt:
     pass
+RTLOG.log.close()
