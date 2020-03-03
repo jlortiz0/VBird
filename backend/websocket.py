@@ -38,8 +38,6 @@ async def connection_handler(sock, _):
                     "method":   "pointsList",
                     "points":   output
                     }))
-                if "justDrone" in msg:
-                    asyncio.ensure_future(droneByItself())
             elif msg["method"] == "start":
                 persist["vel"] = msg["vel"]
                 RTLOG.set_sock(sock)
@@ -73,31 +71,6 @@ async def connection_handler(sock, _):
 def build_err(msg, code):
     print("Error: "+msg+"\nCode: "+str(code))
     return "{{\"method\": \"error\", \"message\": \"{0}\", \"code\": {1}}}".format(msg, code)
-
-async def droneByItself():
-    drone = RTLOG.drone
-    await drone.takeoff()
-    dsty = 100 * (persist["lines"][0][0] * avg[0] + persist["lines"][0][1])
-    dstx = 100 * persist["lines"][0][2]
-    #Intended height and current height
-    intH = persist["height"] * 100
-    curH = await self.drone.get_height()
-    if abs(intH - curH) > 50:
-        drone.send_rc_control(0, 0, max(min(abs(intH - curH), 100), -100), 0)
-    elif math.hypot(dsty, dstx) > 50:
-        if abs(dstx) < abs(dsty):
-            #Calculate the tangent of the triangle formed by dst and dsty
-            tan = math.copysign(dstx/dsty, dstx)
-            #Find the side lengths of similar triangle with the longest side as 100
-            #Make sure that we round off as the function only accepts int
-            #Copy signs to ensure we go the right direction
-            self.drone.send_rc_control(round(tan*100), int(math.copysign(100, dsty)), 0, 0)
-        else:
-            tan = math.copysign(dsty/dstx, dsty)
-            self.drone.send_rc_control(int(math.copysign(100, dstx), round(tan*100), 0, 0)
-    await asyncio.sleep(1)
-    drone.send_rc_control(0, 0, 0, 0)
-    await drone.land()
 
 TOLERANCE = 0.25
 class RealTimeLog:
@@ -187,13 +160,13 @@ class RealTimeLog:
                     if abs(dstx) < abs(dsty):
                         #Calculate the tangent of the triangle formed by dst and dsty
                         tan = math.copysign(dstx/dsty, dstx)
-                        #Find the side lengths of similar triangle with the longest side as 100
+                        #Find the side lengths of similar triangle with the longest side as persist["vel"]
                         #Make sure that we round off as the function only accepts int
                         #Copy signs to ensure we go the right direction
-                        self.drone.send_rc_control(round(tan*100), int(math.copysign(100, dsty))0, 0, 0)
+                        self.drone.send_rc_control(round(tan*persist["vel"]), int(math.copysign(persist["vel"], dsty)), 0, 0)
                     else:
                         tan = math.copysign(dsty/dstx, dsty)
-                        self.drone.send_rc_control(int(math.copysign(100, dstx), round(tan*100), 0, 0)
+                        self.drone.send_rc_control(int(math.copysign(persist["vel"], dstx)), round(tan*persist["vel"]), 0, 0)
                 #Return to using m
                 if abs(avg[1] - intended) > TOLERANCE:
                     print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")

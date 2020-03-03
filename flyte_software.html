@@ -188,7 +188,6 @@
     	<div style="float:left;padding:5px;display:none", id="debugDiv">
 	   	  <button onclick="emergencyStop()">STOP</button>
 	   	  <button onclick="anomaly()">ANOMALY</button>
-	   	  <input type="checkbox" style="float:left" id="debugDroneOnlyBox">
         </div>
       <p>FLYTE SOFTWARE</p>
     </div>
@@ -254,10 +253,6 @@
                 	document.getElementById("formB").style.display = "block";
             	}, true);
             	logData("Sent "+request.points.length+" points to backend");
-            	if (document.getElementById("debugDroneOnlyBox").checked) {
-            		logData("WARNING: Drone only debug mode enabled! Scripts may act strangely!");
-            		request.justDrone = true;
-            	}
                 sendData(request);
             }
 
@@ -279,17 +274,11 @@
                 		graphApp.deleteObject(graphObj[i]);
                 	}
                 }
-            	var vel = document.getElementById("dataVel").valueAsNumber;
-            	if (vel > 3) {
-            		vel = 3;
-            	} else if (vel < 0) {
-            		vel = 0;
-            	}
-            	sendData({method: "start", "vel": vel || 3});
+            	sendData({method: "start", "vel": vel || document.getElementById("dataVel").valueAsNumber});
             }
         </script>
         <h4 style="margin: 16px">Flight Planner:</h4>
-        <form novalidate onsubmit="getFlightPts()" id="formA" action="javascript:void(0);">
+        <form onsubmit="getFlightPts()" id="formA" action="javascript:void(0);">
             Formation: <select name="shape">
                 <option value="squ">Square</option>
                 <option value="trig">Triangle</option>
@@ -297,7 +286,7 @@
                 <option value="cir">Circle</option>
             </select>
             <br>
-            # of drones: <input type="number" name="droneCount" value=4><br>
+            # of drones: <input type="number" name="droneCount" value=4 min=1><br>
             Distance between drones: <input type="number" name="droneDist" value=2><br>
             Drone pos: <input type="number" name="pAX" value=0 readonly>
             <input type="number" name="pAY" value=0 readonly>
@@ -307,10 +296,10 @@
             Target height: <input type="number" name="pBZ" value=5><br>
             <input type="submit" value="Submit">
         </form>
-        <form style="display: none" novalidate onreset="delFlightPts()" id="formB" onsubmit="startTheDrones()" action="javascript:void(0);">
+        <form style="display: none" onreset="delFlightPts()" id="formB" onsubmit="startTheDrones()" action="javascript:void(0);">
             Please look at the graph and ensure that all flight paths are correct. <br>
             <input type="reset" value="That's wrong"><br>
-            Max velocity (0 for none): <input type="number" name="velMax" id="dataVel" value=0><br>
+            Drive power (10-100%): <input type="number" name="velMax" id="dataVel" value=65 min=10 max=100><br>
             <input type="submit" value="Go">
         </form>
       </div>
