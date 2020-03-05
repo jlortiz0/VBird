@@ -301,6 +301,7 @@ class Tello:
                                               socket.SOCK_DGRAM)  # UDP
             self.clientSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.clientSocket.bind(('', self.UDP_PORT))  # For UDP response (receiving data)
+        self._oldSock = self.clientSocket
         self.clientSocket = (await asyncio.get_event_loop().create_datagram_endpoint(lambda: DataProtocol(self),
                                                                               sock=self.clientSocket))[0]
 
