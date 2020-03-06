@@ -26,6 +26,7 @@ def stdev():
     return final
 
 def reset():
+    global total, deviate
     std = stdev()
     total = 0
     deviate = []
@@ -34,7 +35,7 @@ def reset():
     return std
 
 async def run():
-    global LINES, deviate, total, drone, sTime, TOLERANCE, HEIGHT, LINES, VEL
+    global deviate, total
     if not port.in_waiting:
         port.write(b'lep\r')
         port.flush()
@@ -69,8 +70,8 @@ async def run():
             dstx = 100 * (LINES[0][2] - avg[0])
             print(dstx, dsty)
             #Intended height and current height
-            intH = HEIGHT * 100
-            curH = await drone.get_height()
+            #intH = HEIGHT * 100
+            #curH = await drone.get_height()
             #Try to normalize height first
             #if abs(intH - curH) > 50:
                 #drone.send_rc_control(0, 0, max(min(abs(intH - curH), 100), -100), 0)

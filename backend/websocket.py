@@ -6,8 +6,8 @@ import time
 import signal
 import asyncio
 import traceback
-import serial
 import websockets
+import serial
 import serial.tools.list_ports
 from fuentes import Tello
 
@@ -20,7 +20,7 @@ async def connection_handler(sock, _):
             msg = json.loads(msg)
             if msg["method"] == "calcPoints":
                 lines = []
-                for i,x in enumerate(msg["lines"]):
+                for i, x in enumerate(msg["lines"]):
                     x = x.split(' ')
                     #(slope, yint, targetX)
                     lines.append((-float(x[0][:-1])/float(x[2][:-1]),
@@ -65,8 +65,6 @@ async def connection_handler(sock, _):
                 await sock.send(build_err("No such method "+msg["method"], 1))
     except websockets.exceptions.ConnectionClosedOK:
         pass
-    except websockets.exceptions.WebSocketException:
-        traceback.print_exc()
     except Exception:
         traceback.print_exc()
 
@@ -95,7 +93,7 @@ class RealTimeLog:
 
     async def anomaly(self, direct):
         await self.drone.flip(direct)
-    
+
     def reset(self):
         stdev = self.stdev()
         self.total = 0

@@ -1,13 +1,20 @@
 #!/usr/bin/python3
 
 import time
-import math
 import serial
 import serial.tools.list_ports
 
+LINES = [
+    #Hortizontal, y=3.4, x=0 to x=7.62
+    (0, 3.4, 7.62)
+]
+TOLERANCE = 0
+DEVIATE = 0
+TOTAL = 0
+F = open('logs/anomaly.log', 'w')
+
 def run():
-    global DEVIATE
-    global TOTAL
+    global DEVIATE, TOTAL
     port = serial.Serial(serial.tools.list_ports.comports()[0].device, 115200)
     #time.sleep(2)
     #port.write(b'quit\r\n\r\n')
@@ -52,14 +59,6 @@ def run():
                     return
         time.sleep(0.25)
 
-LINES = [
-    #Hortizontal, y=3.4, x=0 to x=7.62
-    (0, 3.4, 7.62)
-]
-TOLERANCE = 0
-DEVIATE = 0
-TOTAL = 0
-F = open('logs/anomaly.log', 'w')
 try:
     run()
 except KeyboardInterrupt:

@@ -3,7 +3,6 @@
 #Original code can be found at https://github.com/damiafuentes/DJITelloPy
 #I just modified it to be async
 
-import sys
 import functools
 import logging
 import socket
@@ -51,14 +50,14 @@ class DataProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         try:
             self.drone.response = data[:1024]
-        except Exception as e:
+        except TypeError as e:
             self.drone.LOGGER.error(e)
 
 class StateProtocol(DataProtocol):
     def datagram_received(self, data, addr):
         self.drone.response_state = data
         self.drone.check_state()
-            
+
 class Tello:
     """Python wrapper to interact with the Ryze Tello drone using the official Tello api.
     Tello API documentation:
@@ -81,7 +80,7 @@ class Tello:
     LOGGER.setLevel(logging.WARNING)
     # use logging.getLogger('djitellopy').setLevel(logging.<LEVEL>) in YOUR CODE
     # to only receive logs of the desired level and higher
-    
+
     STATE_UDP_PORT = 8890
 
     is_flying = False
@@ -108,7 +107,6 @@ class Tello:
     def __init__(self,
                  host='192.168.10.1',
                  port=8889,
-                 client_socket=None,
                  enable_exceptions=True,
                  retry_count=3):
 
@@ -123,27 +121,27 @@ class Tello:
         try:
             if self.response_state != 'ok':
                 self.response_state = self.response_state.decode('ASCII')
-                list = self.response_state.replace(';', ':').split(':')
-                self.pitch = int(list[1])
-                self.roll = int(list[3])
-                self.yaw = int(list[5])
-                self.speed_x = int(list[7])
-                self.speed_y = int(list[9])
-                self.speed_z = int(list[11])
-                self.temperature_lowest = int(list[13])
-                self.temperature_highest = int(list[15])
-                self.distance_tof = int(list[17])
-                self.height = int(list[19])
-                self.battery = int(list[21])
-                self.barometer = float(list[23])
-                self.flight_time = float(list[25])
-                self.acceleration_x = float(list[27])
-                self.acceleration_y = float(list[29])
-                self.acceleration_z = float(list[31])
-                self.attitude = {'pitch': int(list[1]), 'roll': int(list[3]), 'yaw': int(list[5])}
-        except Exception as e:
+                ls = self.response_state.replace(';', ':').split(':')
+                self.pitch = int(ls[1])
+                self.roll = int(ls[3])
+                self.yaw = int(ls[5])
+                self.speed_x = int(ls[7])
+                self.speed_y = int(ls[9])
+                self.speed_z = int(ls[11])
+                self.temperature_lowest = int(ls[13])
+                self.temperature_highest = int(ls[15])
+                self.distance_tof = int(ls[17])
+                self.height = int(ls[19])
+                self.battery = int(ls[21])
+                self.barometer = float(ls[23])
+                self.flight_time = float(ls[25])
+                self.acceleration_x = float(ls[27])
+                self.acceleration_y = float(ls[29])
+                self.acceleration_z = float(ls[31])
+                self.attitude = {'pitch': int(ls[1]), 'roll': int(ls[3]), 'yaw': int(ls[5])}
+        except (ValueError, AttributeError, IndexError) as e:
             self.LOGGER.error(e)
-            self.LOGGER.error(f"Response was is {self.response_state}")
+            self.LOGGER.error("Response was %s", self.response_state)
 
     @accepts(command=str, timeout=int)
     async def send_command_with_return(self, command, timeout=RESPONSE_TIMEOUT):
@@ -156,7 +154,7 @@ class Tello:
         if diff < self.TIME_BTW_COMMANDS:
             await asyncio.sleep(diff)
 
-        self.LOGGER.info('Send command: ' + command)
+        self.LOGGER.info('Send command: %s', command)
         timestamp = time.time()
 
         self.clientSocket.sendto(command.encode('utf-8'), self.address)
@@ -164,7 +162,7 @@ class Tello:
         while self.response is None:
             await asyncio.sleep(0.1)
             if time.time() - timestamp > timeout:
-                self.LOGGER.warning('Timeout exceed on command ' + command)
+                self.LOGGER.warning('Timeout exceed on command %s', command)
                 return False
 
         try:
@@ -173,7 +171,7 @@ class Tello:
             self.LOGGER.error(e)
             return None
 
-        self.LOGGER.info(f'Response {command}: {response}')
+        self.LOGGER.info('Response %s: %s', command, response)
 
         self.response = None
 
@@ -204,7 +202,7 @@ class Tello:
                 d: yaw (-100~100)
         """
 
-        self.LOGGER.info('Send command (no expect response): ' + command)
+        self.LOGGER.info('Send command (no expect response): %s', command)
         self.clientSocket.sendto(command.encode('utf-8'), self.address)
 
     @accepts(command=str, timeout=int)
@@ -236,10 +234,10 @@ class Tello:
             bool: True for successful, False for unsuccessful
         """
         response = None
-        for i in range(0, self.retry_count):
+        for _ in range(0, self.retry_count):
             response = await self.send_command_with_return(command, timeout=timeout)
 
-            if response == 'OK' or response == 'ok':
+            if response.lower() == 'ok':
                 return True
 
         return self.return_error_on_send_command(command, response, self.enable_exceptions)
@@ -267,27 +265,23 @@ class Tello:
             response = str(response)
         except TypeError as e:
             self.LOGGER.error(e)
-            pass
 
         if ('error' not in response) and ('ERROR' not in response) and ('False' not in response):
             if response.isdigit():
                 return int(response)
-            else:
-                try:
-                    return float(response)  # isdigit() is False when the number is a float(barometer)
-                except ValueError:
-                    return response
-        else:
-            return self.return_error_on_send_command(command, response, self.enable_exceptions)
+            try:
+                return float(response)  # isdigit() is False when the number is a float(barometer)
+            except ValueError:
+                return response
+        return self.return_error_on_send_command(command, response, self.enable_exceptions)
 
     def return_error_on_send_command(self, command, response, enable_exceptions):
         """Returns False and print an informative result code to show unsuccessful response"""
         msg = 'Command ' + command + ' was unsuccessful. Message: ' + str(response)
         if enable_exceptions:
             raise Exception(msg)
-        else:
-            self.LOGGER.error(msg)
-            return False
+        self.LOGGER.error(msg)
+        return False
 
     async def connect(self, client_socket=None):
         """Entry SDK mode
@@ -303,14 +297,14 @@ class Tello:
             self.clientSocket.bind(('', self.UDP_PORT))  # For UDP response (receiving data)
         self._oldSock = self.clientSocket
         self.clientSocket = (await asyncio.get_event_loop().create_datagram_endpoint(lambda: DataProtocol(self),
-                                                                              sock=self.clientSocket))[0]
+                                                                                     sock=self.clientSocket))[0]
 
         self.stateSocket = socket.socket(socket.AF_INET,
                                          socket.SOCK_DGRAM)
         self.stateSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.stateSocket.bind(('', self.STATE_UDP_PORT))  # for accessing the states of Tello
         self.stateSocket = (await asyncio.get_event_loop().create_datagram_endpoint(lambda: StateProtocol(self),
-                                                                              sock=self.stateSocket))[0]
+                                                                                    sock=self.stateSocket))[0]
         return await self.send_control_command("command")
 
     async def takeoff(self):
@@ -323,8 +317,7 @@ class Tello:
         if await self.send_control_command("takeoff", timeout=20):
             self.is_flying = True
             return True
-        else:
-            return False
+        return False
 
     async def land(self):
         """Tello auto land
@@ -334,8 +327,7 @@ class Tello:
         if await self.send_control_command("land"):
             self.is_flying = False
             return True
-        else:
-            return False
+        return False
 
     async def emergency(self):
         """Stop all motors immediately
@@ -596,22 +588,16 @@ class Tello:
             bool: True for successful, False for unsuccessful
         """
         if int(time.time() * 1000) - self.last_rc_control_sent < self.TIME_BTW_RC_CONTROL_COMMANDS:
-            pass
-        else:
-            self.last_rc_control_sent = int(time.time() * 1000)
-            return self.send_command_without_return('rc %s %s %s %s' % (self.round_to_100(left_right_velocity),
-                                                                        self.round_to_100(forward_backward_velocity),
-                                                                        self.round_to_100(up_down_velocity),
-                                                                        self.round_to_100(yaw_velocity)))
-
-    @accepts(x=int)
-    def round_to_100(self, x):
-        if x > 100:
-            return 100
-        elif x < -100:
-            return -100
-        else:
-            return x
+            return True
+        left_right_velocity = min(max(left_right_velocity, -100), 100)
+        forward_backward_velocity = min(max(forward_backward_velocity, -100), 100)
+        up_down_velocity = min(max(up_down_velocity, -100), 100)
+        yaw_velocity = min(max(yaw_velocity, -100), 100)
+        self.last_rc_control_sent = int(time.time() * 1000)
+        return self.send_command_without_return('rc %s %s %s %s' % (left_right_velocity,
+                                                                    forward_backward_velocity,
+                                                                    up_down_velocity,
+                                                                    yaw_velocity))
 
     async def set_wifi_credentials(self, ssid, password):
         """Set the Wi-Fi SSID and password. The Tello will reboot afterwords.
