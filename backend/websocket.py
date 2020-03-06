@@ -2,6 +2,7 @@
 
 import json
 import math
+import time
 import signal
 import asyncio
 import traceback
@@ -43,6 +44,7 @@ async def connection_handler(sock, _):
                 RTLOG.set_sock(sock)
                 RTLOG.reset()
                 await RTLOG.drone.takeoff()
+                RTLOG.log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*persist["lines"][0]))
             elif msg["method"] == "getDronePos":
                 await sock.send(json.dumps({
                     "method":   "dronePos",
@@ -51,7 +53,7 @@ async def connection_handler(sock, _):
                     "z":        RTLOG.masterPos[2],
                     }))
             elif msg["method"] == "anomaly":
-                await RTLOG.anomaly(msg["dir"], msg["amt"])
+                await RTLOG.anomaly(msg["dir"])
             elif msg["method"] == "emer":
                 await RTLOG.drone.emergency()
             elif msg["method"] == "ping":
@@ -82,18 +84,17 @@ class RealTimeLog:
         #self.masterSerial = "ABCD"
         self.masterPos = (0, 0, 0)
         self.drone = Tello()
-        self.log = open('logs/rtserial.log', 'w')
+        self.log = open('logs/VBirdDebug.log', 'w')
         self.time = time.time()
-        self.log.write('time x y intendY\n')
 
     def stdev(self):
         final = 0
-        for x in self.deviate:
+        for x in self.deviate[2:-2]:
             final += math.sqrt(x**2/self.total)
         return final
 
-    async def anomaly(self, direct, amt):
-        await self.drone.move(direct, amt)
+    async def anomaly(self, direct):
+        await self.drone.flip(direct)
     
     def reset(self):
         stdev = self.stdev()
@@ -107,15 +108,13 @@ class RealTimeLog:
         self.sock = sock
 
     async def run(self):
-        #await asyncio.sleep(2)
-        #self.port.write(b'reset\r\n\r\n')
-        #self.port.flush()
-        await asyncio.sleep(2)
-        self.port.write(b'lep\n')
-        self.port.flush()
+        await asyncio.sleep(1)
+        if not self.port.in_waiting:
+            self.port.write(b'lep\n')
+            self.port.flush()
         await asyncio.sleep(0.25)
         await self.drone.connect()
-        self.port.reset_input_buffer()
+        self.port.read(5)
         while True:
             avg = [0, 0, 0]
             count = 0
@@ -128,10 +127,8 @@ class RealTimeLog:
                     for i in range(len(data)-1):
                         avg[i] += data[i+1]
                     count += 1
-            if not count:
-                await asyncio.sleep(0.25)
-                continue
-            avg = tuple(map(lambda x: x/count, avg))
+            if count:
+                avg = tuple(map(lambda x: x/count, avg))
             if self.sock and self.masterPos != avg:
                 await self.sock.send(json.dumps({
                     "method":   "dronePos",
@@ -168,16 +165,16 @@ class RealTimeLog:
                         tan = math.copysign(dsty/dstx, dsty)
                         self.drone.send_rc_control(int(math.copysign(persist["vel"], dstx)), round(tan*persist["vel"]), 0, 0)
                 #Return to using m
-                if abs(avg[1] - intended) > TOLERANCE:
-                    print("Anomaly detected! "+str(round(avg[1]-intended, 3))+" m off!")
-                else:
-                    print("On track.")
-                if abs(avg[0] - persist["lines"][0][2]) <= TOLERANCE:
+                if math.hypot(avg[1] - intended, avg[0] - persist["lines"][0][2]) <= TOLERANCE:
                     del persist["lines"][0]
                     self.drone.send_rc_control(0, 0, 0, 0)
-                    if not persist["lines"]:
+                    deviate = str(self.reset())
+                    print("Line completed. Average deviation "+deviate)
+                    self.log.write("!! LINEEND {}\n".format(deviate))
+                    if persist["lines"]:
+                        self.log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*persist["lines"][0]))
+                    else:
                         await self.drone.land()
-                    print("Line completed. Average deviation "+str(self.reset()))
             await asyncio.sleep(0.25)
 
 RTLOG = RealTimeLog()
@@ -188,5 +185,5 @@ asyncio.ensure_future(RTLOG.run())
 try:
     asyncio.get_event_loop().run_forever()
 except KeyboardInterrupt:
-    pass
+    RTLOG.drone._oldSock.sendto(b'land', RTLOG.drone.address)
 RTLOG.log.close()

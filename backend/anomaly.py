@@ -64,6 +64,6 @@ try:
     run()
 except KeyboardInterrupt:
     pass
-print("Complete. Average deviation: {:.3f}".format(math.sqrt(DEVIATE**2/TOTAL)))
-F.write("Complete. Average deviation: {:.3f}".format(math.sqrt(DEVIATE**2/TOTAL)))
+print("Complete. Average deviation: {:.3f}".format(DEVIATE/TOTAL))
+F.write("Complete. Average deviation: {:.3f}".format(DEVIATE/TOTAL))
 F.close()

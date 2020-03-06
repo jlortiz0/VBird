@@ -173,11 +173,10 @@
       }
 
       function anomaly() {
-      	const dirs = ["left", "right", "forward", "back"];
+      	const dirs = ["l", "r", "f", "b"];
       	sendData({
       		method: "anomaly",
-      		dir: dirs[Math.floor(Math.random() * 4)],
-      		amt: 100
+      		dir: dirs[Math.floor(Math.random() * 4)]
       	});
       }
     </script>
@@ -186,8 +185,8 @@
 
     <div class="navbar">
     	<div style="float:left;padding:5px;display:none", id="debugDiv">
-	   	  <button onclick="emergencyStop()">STOP</button>
-	   	  <button onclick="anomaly()">ANOMALY</button>
+	   	  <button onclick="emergencyStop()">EMER</button>
+	   	  <button onclick="anomaly()">FLIP</button>
         </div>
       <p>FLYTE SOFTWARE</p>
     </div>
@@ -220,7 +219,7 @@
             function getFlightPts() {
             	const f = document.getElementById("formA");
             	pts = graphApp.getAllObjectNames("point");
-            	if (pts.length > 1) {
+            	if (pts.length > 2) {
 	        		f[6].value = graphApp.getXcoord(pts[pts.length-1]);
 	        		f[7].value = graphApp.getYcoord(pts[pts.length-1]);
 	        	} else {
@@ -299,14 +298,15 @@
         <form style="display: none" onreset="delFlightPts()" id="formB" onsubmit="startTheDrones()" action="javascript:void(0);">
             Please look at the graph and ensure that all flight paths are correct. <br>
             <input type="reset" value="That's wrong"><br>
-            Drive power (10-100%): <input type="number" name="velMax" id="dataVel" value=65 min=10 max=100><br>
+            Drive power (10-50%): <input type="number" name="velMax" id="dataVel" value=30 min=10 max=50><br>
+            This is restricted for your safety.<br>
             <input type="submit" value="Go">
         </form>
       </div>
 
       <button class="openbtn" id="leftPanelBtn" onclick="toggleLeftPanel()" style="left: 0">Log ></button>
       <button class="openbtn" id="rightPanelBtn" onclick="toggleRightPanel()" style="right: 0">< Data</button>
-      <script src="https://www.geogebra.org/apps/deployggb.js"></script>
+      <script src="GeoGebra/deployggb.js"></script>
       <div id="graph"></div>
       <script>
         const width  = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
@@ -319,7 +319,7 @@
         	}
         }
         function onGraphInit() {
-            logData("Loaded GeoGerba graph system");
+            logData("Loaded GeoGebra graph system");
             graphApp.evalCommand("ZoomIn(-1.5, -1.5, 23, 12)");
             registerMsgCall("dronePos", function(data) {
             	const f = document.getElementById("formA");
@@ -335,7 +335,8 @@
             logData("Registered GeoGebra listener");
         }
         var ggbApp = new GGBApplet({id: "graphApp", appName: "classic", "width": width, "height": height-78, showToolBar: true, customToolBar: "15 1 || 6 || 40 41 42", appletOnLoad: onGraphInit, enable3d: true}, '5.0');
-        window.addEventListener("load", function() { 
+        window.addEventListener("load", function() {
+        	ggbApp.setHTML5Codebase('GeoGebra/HTML5/5.0/web3d/'); 
             ggbApp.inject('graph');
         });
       </script>
