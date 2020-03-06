@@ -1,3 +1,4 @@
 *.pyc
 *.log
 GeoGebra/*
+.DS_Store
