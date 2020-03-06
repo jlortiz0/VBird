@@ -679,13 +679,13 @@ class Tello:
         """
         return await self.send_read_command('wifi?')
 
-    async def end(self):
+    def end(self, override=False):
         """Call this method when you want to end the tello object"""
-        if self.is_flying:
-            await self.land()
+        if self.is_flying and not override:
+            raise Exception('Drone is still flying!')
         if self.response:
             self.clientSocket.close()
             self.stateSocket.close()
 
     def __del__(self):
-        asyncio.ensure_future(self.end())
+        self.end(True)
