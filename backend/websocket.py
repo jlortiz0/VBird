@@ -83,13 +83,11 @@ class RealTimeLog:
         self.masterPos = (0, 0, 0)
         self.drone = Tello()
         self.log = open('logs/VBirdDebug.log', 'w')
-        self.time = time.time()
 
     def stdev(self):
-        final = 0
-        for x in self.deviate[2:-2]:
-            final += math.sqrt(x**2/self.total)
-        return final
+        if self.total < 4:
+            return 0
+        return sum(self.deviate[2:-2])/(self.total-4)
 
     async def anomaly(self, direct):
         await self.drone.flip(direct)
@@ -106,12 +104,13 @@ class RealTimeLog:
         self.sock = sock
 
     async def run(self):
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.5)
         if not self.port.in_waiting:
             self.port.write(b'lep\n')
             self.port.flush()
         await asyncio.sleep(0.25)
         await self.drone.connect()
+        self.time = time.time()
         self.port.read(5)
         while True:
             avg = [0, 0, 0]
@@ -127,16 +126,18 @@ class RealTimeLog:
                     count += 1
             if count:
                 avg = tuple(map(lambda x: x/count, avg))
-            if self.sock and self.masterPos != avg:
-                await self.sock.send(json.dumps({
-                    "method":   "dronePos",
-                    "x":        avg[0],
-                    "y":        avg[1],
-                    "z":        avg[2]
-                }))
-            self.masterPos = avg
+                if self.sock and self.masterPos != avg:
+                    await self.sock.send(json.dumps({
+                        "method":   "dronePos",
+                        "x":        avg[0],
+                        "y":        avg[1],
+                        "z":        avg[2]
+                    }))
+                self.masterPos = avg
+            else:
+                avg = self.masterPos
             if persist["lines"] and self.sock:
-                intended = persist["lines"][0][0] * avg[0] + persist["lines"][0][1]
+                intended = persist["lines"][0][0] * persist["lines"][0][2] + persist["lines"][0][1]
                 self.log.write('{:.3f} {:.3f} {:.3f} {:.3f}\n'.format(time.time()-self.time, avg[0], avg[1], intended))
                 self.deviate.append(abs(intended - avg[1]))
                 self.total += 1
@@ -147,7 +148,7 @@ class RealTimeLog:
                 dstx = 100 * (persist["lines"][0][2] - avg[0])
                 #Intended height and current height
                 intH = persist["height"] * 100
-                curH = await self.drone.get_height()
+                curH = self.drone.height
                 #Try to normalize height first
                 if abs(intH - curH) > 50:
                     self.drone.send_rc_control(0, 0, max(min(abs(intH - curH), 100), -100), 0)

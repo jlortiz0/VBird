@@ -237,7 +237,7 @@ class Tello:
         for _ in range(0, self.retry_count):
             response = await self.send_command_with_return(command, timeout=timeout)
 
-            if response.lower() == 'ok':
+            if type(response) == str and response.lower() == 'ok':
                 return True
 
         return self.return_error_on_send_command(command, response, self.enable_exceptions)
