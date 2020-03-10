@@ -16,13 +16,14 @@ F = open('logs/anomaly.log', 'w')
 def run():
     global DEVIATE, TOTAL
     port = serial.Serial(serial.tools.list_ports.comports()[0].device, 115200)
-    #time.sleep(2)
-    #port.write(b'quit\r\n\r\n')
-    #port.flush()
-    #time.sleep(2)
-    port.write(b'lep\n')
-    port.flush()
-    time.sleep(0.25)
+    time.sleep(0.5)
+    if not port.in_waiting:
+        port.write(b'\r\r')
+        port.flush()
+        time.sleep(1)
+        port.write(b'lep\n')
+        port.flush()
+        time.sleep(0.25)
     port.reset_input_buffer()
     print("Starting line {:.3f}x + {:.3f} to x={:.3f}".format(*LINES[0]))
     while True:

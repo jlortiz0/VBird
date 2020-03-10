@@ -10,9 +10,13 @@ import websockets
 import serial
 import serial.tools.list_ports
 from fuentes import Tello
+from Rectangle import Rectangle, Square
+from Circle import Circle
+from Triangle import Triangle
 
 persist = {"lines":[]}
 async def connection_handler(sock, _):
+    RTLOG.sock = sock
     try:
         while True:
             msg = await sock.recv()
@@ -28,12 +32,24 @@ async def connection_handler(sock, _):
                                   msg["points"][i+1][0]))
                 persist["lines"] = lines
                 output = []
-                d = msg["dist"]
+                shape = None
+                if msg["shape"] == "Square":
+                    shape = Square(msg["count"], msg["dist"])
+                elif msg["shape"] == "Triangle":
+                    shape = Triangle(msg["count"], msg["dist"])
+                elif msg["shape"] == "Circle":
+                    shape = Circle(msg["count"], msg["dist"])
+                elif msg["shape"] == "Rectangle":
+                    shape = Rectangle(msg["count"], msg["dist"], msg["dist2"])
+                if not shape.checkFormation():
+                    await sock.send(json.dumps({
+                        "method":   "error",
+                        "message":  "Invalid number of drones for shape "+msg["shape"],
+                        "code":     2
+                    }))
+                    continue
                 for point in msg["points"]:
-                    output.append([point[3]])
-                    output[-1].append((point[0]+d, point[1]))
-                    output[-1].append((point[0]+d, point[1]+d))
-                    output[-1].append((point[0], point[1]+d))
+                    output.append(shape.calcPoints(*point))
                 persist["height"] = msg["height"]
                 await sock.send(json.dumps({
                     "method":   "pointsList",
@@ -41,10 +57,10 @@ async def connection_handler(sock, _):
                     }))
             elif msg["method"] == "start":
                 persist["vel"] = msg["vel"]
-                RTLOG.set_sock(sock)
-                RTLOG.reset()
                 await RTLOG.drone.takeoff()
                 RTLOG.log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*persist["lines"][0]))
+                RTLOG.reset()
+                RTLOG.run = True
             elif msg["method"] == "getDronePos":
                 await sock.send(json.dumps({
                     "method":   "dronePos",
@@ -62,15 +78,15 @@ async def connection_handler(sock, _):
                 await sock.close()
                 raise KeyboardInterrupt
             else:
-                await sock.send(build_err("No such method "+msg["method"], 1))
+                await sock.send(json.dumps({
+                    "method":   "error",
+                    "message":  "No such method "+msg["method"],
+                    "code":     1
+                })
     except websockets.exceptions.ConnectionClosedOK:
         pass
     except Exception:
         traceback.print_exc()
-
-def build_err(msg, code):
-    print("Error: "+msg+"\nCode: "+str(code))
-    return "{{\"method\": \"error\", \"message\": \"{0}\", \"code\": {1}}}".format(msg, code)
 
 TOLERANCE = 0.25
 class RealTimeLog:
@@ -83,6 +99,7 @@ class RealTimeLog:
         self.masterPos = (0, 0, 0)
         self.drone = Tello()
         self.log = open('logs/VBirdDebug.log', 'w')
+        self.run = False
 
     def stdev(self):
         if self.total < 4:
@@ -100,18 +117,18 @@ class RealTimeLog:
         self.log.flush()
         return stdev
 
-    def set_sock(self, sock=None):
-        self.sock = sock
-
     async def run(self):
         await asyncio.sleep(0.5)
         if not self.port.in_waiting:
+            self.port.write(b'\r\r')
+            self.port.flush()
+            await asyncio.sleep(1)
             self.port.write(b'lep\n')
             self.port.flush()
         await asyncio.sleep(0.25)
         await self.drone.connect()
         self.time = time.time()
-        self.port.read(5)
+        self.port.reset_input_buffer()
         while True:
             avg = [0, 0, 0]
             count = 0
@@ -136,7 +153,7 @@ class RealTimeLog:
                 self.masterPos = avg
             else:
                 avg = self.masterPos
-            if persist["lines"] and self.sock:
+            if persist["lines"] and self.run:
                 intended = persist["lines"][0][0] * persist["lines"][0][2] + persist["lines"][0][1]
                 self.log.write('{:.3f} {:.3f} {:.3f} {:.3f}\n'.format(time.time()-self.time, avg[0], avg[1], intended))
                 self.deviate.append(abs(intended - avg[1]))
@@ -174,6 +191,7 @@ class RealTimeLog:
                         self.log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*persist["lines"][0]))
                     else:
                         await self.drone.land()
+                        self.run = False
             await asyncio.sleep(0.25)
 
 RTLOG = RealTimeLog()

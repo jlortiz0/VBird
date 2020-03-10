@@ -7,22 +7,23 @@ import serial
 import serial.tools.list_ports
 from fuentes import Tello
 
-TOLERANCE = 0.25
+TOLERANCE = 0.25*math.sqrt(2)
 HEIGHT = 0.5
-#Diagonal, y=x to x=4
-LINES = [(1, 0, 3)]
+#Horizontal, y=3.4 to x=5
+LINES = [(0, 3.4, 5)]
 VEL = 20
 port = serial.Serial(serial.tools.list_ports.comports()[0].device, 115200)
 total = 0
 deviate = []
 drone = Tello()
 log = open('logs/UWBTest.log', 'w')
-ANOMTIME = 1
+ANOMTIME = 1.5
 
 def stdev():
     #final = 0
     #for x in deviate[2:-2]:
         #final += math.sqrt(x**2/total)
+    print(len(deviate[2:-2]), total-4)
     return sum(deviate[2:-2])/(total-4)
 
 def reset():
@@ -38,21 +39,35 @@ async def run():
     global deviate, total
     await asyncio.sleep(0.5)
     if not port.in_waiting:
+        port.write(b'\r\r')
+        port.flush()
+        await asyncio.sleep(1)
         port.write(b'lep\r')
         port.flush()
     await drone.connect()
     port.reset_input_buffer()
     await drone.takeoff()
+    print("Battery: {}%".format(drone.battery))
     sTime = time.time()
+    log.write("!! "+str(sTime))
     log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*LINES[0]))
     mrPos = (0, 0, 0)
-    didAnom = False
+    didAnom = True
+    didAnom2 = True
     while True:
-        if not didAnom and ANOMTIME > (time.time() - sTime):
-            print("Anomaly create: moving drone -60 cm y!")
-            await drone.move_backward(60)
+        if ANOMTIME < (time.time() - sTime) and not didAnom:
+            print("Anomaly create: moving drone -45 cm y!")
+            await drone.move_back(45)
             port.reset_input_buffer()
             await asyncio.sleep(0.25)
+            didAnom = True
+            print("resuming")
+        if ANOMTIME+1 < (time.time() - sTime) and not didAnom2:
+            print("Anomaly create: moving drone -45 cm y!")
+            await drone.move_back(45)
+            port.reset_input_buffer()
+            await asyncio.sleep(0.25)
+            didAnom2 = True
             print("resuming")
         avg = [0, 0, 0]
         count = 0
@@ -86,7 +101,7 @@ async def run():
             #Try to normalize height first
             #if abs(intH - curH) > 50:
                 #drone.send_rc_control(0, 0, max(min(abs(intH - curH), 100), -100), 0)
-            if math.hypot(dsty, dstx) > 50:
+            if math.hypot(dsty, dstx) > TOLERANCE:
                 if abs(dstx) < abs(dsty):
                     #Calculate the tangent of the triangle formed by dst and dsty
                     tan = math.copysign(dstx/dsty, dstx)
@@ -99,8 +114,8 @@ async def run():
                     tan = math.copysign(dsty/dstx, dsty)
                     print("{:.3f} {:.3f} {:.3f}".format(dstx, dsty, tan*VEL))
                     drone.send_rc_control(int(math.copysign(VEL, dstx)), round(tan*VEL), 0, 0)
-            #Return to using m
-            if abs(avg[0] - LINES[0][2]) <= TOLERANCE:
+            else:
+                #Return to using m
                 del LINES[0]
                 drone.send_rc_control(0, 0, 0, 0)
                 deviate = str(reset())
@@ -117,4 +132,5 @@ try:
     asyncio.run(run())
 except KeyboardInterrupt:
     drone._oldSock.sendto(b'land', drone.address)
+log.flush()
 log.close()

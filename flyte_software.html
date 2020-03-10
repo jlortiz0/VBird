@@ -84,7 +84,6 @@
     }
   </style>
   <script>
-  	const f = document.getElementById("formA");
     function toggleLeftPanel() {
       if (document.getElementById("leftSidePanel").style.width == "25%") {
         document.getElementById("leftSidePanel").style.width = "0";
@@ -207,7 +206,7 @@
             }
             let request = {shape: f[0].value, count: f[1].valueAsNumber, dist: f[2].valueAsNumber, method: "calcPoints", points: [], lines: [], "height": f[8].valueAsNumber};
             for (let i=0; i<pts.length; i++) {
-              request.points.push([graphApp.getXcoord(pts[i]), graphApp.getYcoord(pts[i]), graphApp.getZcoord(pts[i]) || f[8].valueAsNumber, pts[i]]);
+              request.points.push([graphApp.getXcoord(pts[i]), graphApp.getYcoord(pts[i]), pts[i]]);
               if (i) {
                 let line = graphApp.evalCommandGetLabels("Line("+pts[i-1]+", "+pts[i]+")");
                 request.lines.push(graphApp.getLaTeXString(line));
@@ -254,23 +253,39 @@
             }
             sendData({method: "start", "vel": document.getElementById("dataVel").valueAsNumber});
           }
+
+          function spanSwitch(event) {
+          	if (f[0].selectedIndex == 1) {
+          		document.getElementById("distText1").innerHTML = "Side 1 (horizontal): ";
+          		document.getElementById("distText2").style.display = "block";
+          	} else {
+          		if (f[0].selectedIndex == 2) {
+          			document.getElementById("distText1").innerHTML = "Radius: ";
+          		} else {
+          			document.getElementById("distText1").innerHTML = "Side length: ";
+          		}
+          		document.getElementById("distText2").style.display = "none";
+          	}
+          }
       </script>
       <h4 style="margin: 16px">Flight Planner:</h4>
       <form onsubmit="getFlightPts()" id="formA" action="javascript:void(0);">
-        Formation: <select name="shape">
-          <option value="squ">Square</option>
-          <option value="trig">Triangle</option>
-          <option value="rect">Rectangle</option>
-          <option value="cir">Circle</option>
+        Formation: <select name="shape" onchange="spanSwitch()">
+          <option value="Square">Square</option>
+          <option value="Rectangle">Rectangle</option>
+          <option value="Circle">Circle</option>
+          <option value="Triangle">Triangle</option>
         </select><br>
         # of drones: <input type="number" name="droneCount" value=4 min=1><br>
-        Distance between drones: <input type="number" name="droneDist" value=2><br>
+        <span id="distText1">Side length: </span>
+        <input type="number" name="droneDist" value=2><br>
+        <span id="distText2" style="display:none">Side 2 (vertical):
+        <input type="number" name="droneDist2" value=2><br></span>
         Drone pos: <input type="number" name="pAX" value=0 readonly>
-        <input type="number" name="pAY" value=0 readonly>
-        <input type="number" name="pAZ" value=0 readonly><br>
+        <input type="number" name="pAY" value=0 readonly><br>
         Final point: <input type="number" name="pBX" value=5 readonly>
         <input type="number" name="pBY" value=5 readonly><br>
-        Target height: <input type="number" name="pBZ" value=5><br>
+        Target height (cm): <input type="number" name="pBZ" value=50><br>
         <input type="submit" value="Submit">
       </form>
       <form style="display: none" onreset="delFlightPts()" id="formB" onsubmit="startTheDrones()" action="javascript:void(0);">
@@ -287,6 +302,7 @@
     <script src="GeoGebra/deployggb.js"></script>
     <div id="graph"></div>
     <script>
+      const f = document.getElementById("formA");
       const width  = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
       const height = window.innerHeight|| document.documentElement.clientHeight|| document.body.clientHeight;
       function onGraphUpdate(object) {
@@ -299,9 +315,8 @@
         logData("Loaded GeoGebra graph system");
         graphApp.evalCommand("ZoomIn(-1.5, -1.5, 23, 12)");
         registerMsgCall("dronePos", function(data) {
-          f[3].value = data.x;
-          f[4].value = data.y;
-          f[5].value = data.z;
+          f[4].value = data.x;
+          f[5].value = data.y;
           graphApp.evalCommand("masterDrone = Point({"+data.x+","+data.y+"})");
         });
         sendData({method: "getDronePos"});
