@@ -60,7 +60,7 @@ async def connection_handler(sock, _):
                 await RTLOG.drone.takeoff()
                 RTLOG.log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*persist["lines"][0]))
                 RTLOG.reset()
-                RTLOG.run = True
+                RTLOG.move = True
             elif msg["method"] == "getDronePos":
                 await sock.send(json.dumps({
                     "method":   "dronePos",
@@ -82,7 +82,7 @@ async def connection_handler(sock, _):
                     "method":   "error",
                     "message":  "No such method "+msg["method"],
                     "code":     1
-                })
+                }))
     except websockets.exceptions.ConnectionClosedOK:
         pass
     except Exception:
@@ -99,7 +99,7 @@ class RealTimeLog:
         self.masterPos = (0, 0, 0)
         self.drone = Tello()
         self.log = open('logs/VBirdDebug.log', 'w')
-        self.run = False
+        self.move = False
 
     def stdev(self):
         if self.total < 4:
@@ -153,7 +153,7 @@ class RealTimeLog:
                 self.masterPos = avg
             else:
                 avg = self.masterPos
-            if persist["lines"] and self.run:
+            if persist["lines"] and self.move:
                 intended = persist["lines"][0][0] * persist["lines"][0][2] + persist["lines"][0][1]
                 self.log.write('{:.3f} {:.3f} {:.3f} {:.3f}\n'.format(time.time()-self.time, avg[0], avg[1], intended))
                 self.deviate.append(abs(intended - avg[1]))
@@ -191,7 +191,7 @@ class RealTimeLog:
                         self.log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*persist["lines"][0]))
                     else:
                         await self.drone.land()
-                        self.run = False
+                        self.move = False
             await asyncio.sleep(0.25)
 
 RTLOG = RealTimeLog()
