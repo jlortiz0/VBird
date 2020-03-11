@@ -13,14 +13,14 @@ class Rectangle(Shape):
     def calcPoints(self, mastX, mastY, mastName):
         final = []
         perSide = self.numDrones//4
-        for i in range(0, self.sideLen, self.sideLen//perSide):
-            final.append((mastX+i, mastY))
-        for i in range(0, self.sideLen2, self.sideLen2//perSide):
-            final.append((mastX+self.sideLen, mastY+i))
-        for i in range(self.sideLen, 0, -self.sideLen//perSide):
-            final.append((mastX+i, mastY+self.sideLen2))
-        for i in range(self.sideLen2, 0, -self.sideLen2//perSide):
-            final.append((mastX, mastY+i))
+        for i in range(0, perSide):
+            final.append((mastX+i*self.sideLen/perSide, mastY))
+        for i in range(0, perSide):
+            final.append((mastX+self.sideLen, mastY+i*self.sideLen2/perSide))
+        for i in range(perSide, 0, -1):
+            final.append((mastX+i*self.sideLen/perSide, mastY+self.sideLen2))
+        for i in range(perSide, 0, -1):
+            final.append((mastX, mastY+i*self.sideLen2/perSide))
         final[0] = mastName
         return final
 

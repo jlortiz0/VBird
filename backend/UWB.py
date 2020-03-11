@@ -7,23 +7,22 @@ import serial
 import serial.tools.list_ports
 from fuentes import Tello
 
-TOLERANCE = 0.25*math.sqrt(2)
+TOLERANCE = 15*math.sqrt(2)
 HEIGHT = 0.5
-#Horizontal, y=3.4 to x=5
-LINES = [(0, 3.4, 5)]
+#Diagonal, y=x to x=3.8
+LINES = [(0, 3.4, 7)]
 VEL = 20
 port = serial.Serial(serial.tools.list_ports.comports()[0].device, 115200)
 total = 0
 deviate = []
 drone = Tello()
 log = open('logs/UWBTest.log', 'w')
-ANOMTIME = 1.5
+ANOMTIME = 2
 
 def stdev():
     #final = 0
     #for x in deviate[2:-2]:
         #final += math.sqrt(x**2/total)
-    print(len(deviate[2:-2]), total-4)
     return sum(deviate[2:-2])/(total-4)
 
 def reset():
@@ -87,8 +86,8 @@ async def run():
             avg = mrPos
         if LINES:
             intended = LINES[0][0] * LINES[0][2] + LINES[0][1]
-            log.write('{:.3f} {:.3f} {:.3f} {:.3f}\n'.format(time.time()-sTime, avg[0], avg[1], intended))
-            deviate.append(abs(intended - avg[1]))
+            log.write('{:.3f} {:.3f} {:.3f} {:.3f}\n'.format(time.time()-sTime, avg[0], avg[1], LINES[0][0]*avg[0]+LINES[0][1]))
+            deviate.append(abs(LINES[0][0]*avg[0]+LINES[0][1] - avg[1]))
             total += 1
             #Setup some vars to make it more readable
             #Some are multiplied by 100 as drone uses cm, not m
@@ -118,9 +117,9 @@ async def run():
                 #Return to using m
                 del LINES[0]
                 drone.send_rc_control(0, 0, 0, 0)
-                deviate = str(reset())
-                print("Line completed. Average deviation "+deviate)
-                log.write("!! LINEEND {}\n".format(deviate))
+                d = str(reset())
+                print("Line completed. Average deviation "+d)
+                log.write("!! LINEEND {}\n".format(d))
                 if LINES:
                     log.write("!! LINESTART y = {:.3f}x + {:.3f} x to {:.3f}\n".format(*LINES[0]))
                 else:

@@ -4,8 +4,8 @@ import math
 from Shape import Shape
 
 class Triangle(Shape):
-    def checkFormation(self, numDrones):
-        return not (numDrones % 3)
+    def checkFormation(self):
+        return not (self.numDrones % 3)
 
     def calcPoints(self, mastX, mastY, mastName):
         final = []

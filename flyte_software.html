@@ -197,14 +197,14 @@
       <script>
           function getFlightPts() {
             let pts = graphApp.getAllObjectNames("point");
-            if (pts.length > 2) {
+            if (pts.length > 1) {
               f[6].value = graphApp.getXcoord(pts[pts.length-1]);
               f[7].value = graphApp.getYcoord(pts[pts.length-1]);
             } else {
               alert("Please draw a line on the graph");
               return;
             }
-            let request = {shape: f[0].value, count: f[1].valueAsNumber, dist: f[2].valueAsNumber, method: "calcPoints", points: [], lines: [], "height": f[8].valueAsNumber};
+            let request = {shape: f[0].value, count: f[1].valueAsNumber, dist: f[2].valueAsNumber, dist2: f[3].valueAsNumber, method: "calcPoints", points: [], lines: [], "height": f[8].valueAsNumber};
             for (let i=0; i<pts.length; i++) {
               request.points.push([graphApp.getXcoord(pts[i]), graphApp.getYcoord(pts[i]), pts[i]]);
               if (i) {
